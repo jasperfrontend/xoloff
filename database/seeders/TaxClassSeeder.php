@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 /**
  * The three Dutch tax treatments named in SPEC §3, as a starting point.
  *
- * These are ordinary editable rows, not a fixed enum — tax classes stay freely
+ * These are ordinary editable rows, not a fixed enum - tax classes stay freely
  * extensible so Xolution can sell other product types later. Idempotent.
  */
 class TaxClassSeeder extends Seeder

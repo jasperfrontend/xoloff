@@ -9,7 +9,7 @@ return [
     |
     | Initial passwords for the two seeded users (SPEC §3). There is no public
     | registration route, so seeding is the only way an account is created.
-    | Override these in the environment before seeding a deployed instance —
+    | Override these in the environment before seeding a deployed instance -
     | the fallback is a local-development convenience only.
     |
     */
@@ -25,7 +25,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | ISO 3166-1 alpha-2 codes offered when creating a customer. A customer's
-    | country matters because VAT treatment depends on it — but the treatment
+    | country matters because VAT treatment depends on it - but the treatment
     | itself is always chosen by hand on the quote, never derived from this
     | list (SPEC §2). EU members first, then common non-EU markets.
     |

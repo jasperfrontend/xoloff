@@ -18,7 +18,7 @@ class TaxClass extends Model
     ];
 
     /**
-     * Cast as a fixed-precision string, never a float — this value feeds the
+     * Cast as a fixed-precision string, never a float - this value feeds the
      * M2 calculation engine.
      *
      * @return array<string, string>

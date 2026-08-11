@@ -44,7 +44,7 @@ defineOptions({
                     <tr v-if="categories.length === 0">
                         <td
                             colspan="3"
-                            class="px-4 py-8 text-center text-muted-foreground"
+                            class="px-4 py-8 text-center text-foreground"
                         >
                             No categories yet.
                         </td>
@@ -60,12 +60,12 @@ defineOptions({
                                     ProductCategoryController.edit(category.id)
                                         .url
                                 "
-                                class="font-medium underline-offset-4 hover:underline"
+                                class="cursor-pointer font-medium underline-offset-4 hover:underline"
                             >
                                 {{ category.name }}
                             </Link>
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td class="px-4 py-3 text-foreground">
                             {{ category.products_count }}
                         </td>
                         <td class="px-4 py-3 text-right">
@@ -76,7 +76,7 @@ defineOptions({
                                     )
                                 "
                                 title="Delete category?"
-                                description="Products in this category are kept — they simply become uncategorised."
+                                description="Products in this category are kept - they simply become uncategorised."
                             />
                         </td>
                     </tr>

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('billing_address');
 
             // ISO 3166-1 alpha-2. Drives VAT treatment, which is chosen manually
-            // when building a quote — see SPEC §2.
+            // when building a quote - see SPEC §2.
             $table->char('country', 2)->default('NL');
 
             $table->timestamps();

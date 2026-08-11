@@ -57,7 +57,7 @@ const deleteError = computed(() => page.props.errors?.taxClass);
                     <tr v-if="taxClasses.length === 0">
                         <td
                             colspan="4"
-                            class="px-4 py-8 text-center text-muted-foreground"
+                            class="px-4 py-8 text-center text-foreground"
                         >
                             No tax classes yet.
                         </td>
@@ -70,7 +70,7 @@ const deleteError = computed(() => page.props.errors?.taxClass);
                         <td class="px-4 py-3">
                             <Link
                                 :href="TaxClassController.edit(taxClass.id).url"
-                                class="font-medium underline-offset-4 hover:underline"
+                                class="cursor-pointer font-medium underline-offset-4 hover:underline"
                             >
                                 {{ taxClass.name }}
                             </Link>
@@ -78,7 +78,7 @@ const deleteError = computed(() => page.props.errors?.taxClass);
                         <td class="px-4 py-3 tabular-nums">
                             {{ taxClass.percentage }}%
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td class="px-4 py-3 text-foreground">
                             {{ taxClass.products_count }}
                         </td>
                         <td class="px-4 py-3 text-right">

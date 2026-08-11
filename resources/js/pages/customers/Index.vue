@@ -48,7 +48,7 @@ defineOptions({
                     <tr v-if="customers.length === 0">
                         <td
                             colspan="5"
-                            class="px-4 py-8 text-center text-muted-foreground"
+                            class="px-4 py-8 text-center text-foreground"
                         >
                             No customers yet.
                         </td>
@@ -61,13 +61,13 @@ defineOptions({
                         <td class="px-4 py-3">
                             <Link
                                 :href="CustomerController.edit(customer.id).url"
-                                class="font-medium underline-offset-4 hover:underline"
+                                class="cursor-pointer font-medium underline-offset-4 hover:underline"
                             >
                                 {{ customer.company_name }}
                             </Link>
                         </td>
                         <td class="px-4 py-3">{{ customer.contact_person }}</td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td class="px-4 py-3 text-foreground">
                             {{ customer.email }}
                         </td>
                         <td class="px-4 py-3">{{ customer.country }}</td>

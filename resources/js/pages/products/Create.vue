@@ -35,7 +35,7 @@ defineOptions({
         <Heading
             variant="small"
             title="New product"
-            description="Catalog values act as defaults — every quote line stays editable"
+            description="Catalog values act as defaults - every quote line stays editable"
         />
 
         <ProductForm

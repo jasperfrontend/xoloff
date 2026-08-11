@@ -57,8 +57,8 @@ defineOptions({
                     required
                     placeholder="21.00"
                 />
-                <p class="text-xs text-muted-foreground">
-                    0 is valid — use it for zero-rated or reverse-charge.
+                <p class="text-xs text-foreground">
+                    0 is valid - use it for zero-rated or reverse-charge.
                 </p>
                 <InputError :message="errors.percentage" />
             </div>

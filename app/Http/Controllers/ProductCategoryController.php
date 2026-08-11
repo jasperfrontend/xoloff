@@ -51,7 +51,7 @@ class ProductCategoryController extends Controller
     }
 
     /**
-     * Products in this category are kept — their category_id is nulled by the
+     * Products in this category are kept - their category_id is nulled by the
      * foreign key, so deleting a tag never destroys catalog data.
      */
     public function destroy(ProductCategory $productCategory): RedirectResponse

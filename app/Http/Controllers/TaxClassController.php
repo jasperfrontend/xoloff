@@ -51,7 +51,7 @@ class TaxClassController extends Controller
     }
 
     /**
-     * Refused while any product still references this tax class — the foreign
+     * Refused while any product still references this tax class - the foreign
      * key restricts deletion, so we check first and explain rather than 500.
      */
     public function destroy(TaxClass $taxClass): RedirectResponse

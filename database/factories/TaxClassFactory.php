@@ -22,7 +22,7 @@ class TaxClassFactory extends Factory
     }
 
     /**
-     * Zero-rated / reverse charge — the case a non-EU customer gets.
+     * Zero-rated / reverse charge - the case a non-EU customer gets.
      */
     public function zeroRated(): static
     {

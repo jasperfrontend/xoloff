@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Flexible key/value list per product — billing period, startup cost,
+        // Flexible key/value list per product - billing period, startup cost,
         // contract duration, etc. Deliberately not fixed columns (SPEC §3).
         Schema::create('product_specs', function (Blueprint $table) {
             $table->id();

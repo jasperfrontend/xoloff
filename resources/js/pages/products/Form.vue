@@ -112,8 +112,8 @@ function removeSpec(indexToRemove: number) {
                     </SelectItem>
                 </SelectContent>
             </Select>
-            <p class="text-xs text-muted-foreground">
-                A default only — it can be overridden per line on a quote.
+            <p class="text-xs text-foreground">
+                A default only - it can be overridden per line on a quote.
             </p>
             <InputError :message="errors.tax_class_id" />
         </div>
@@ -144,8 +144,8 @@ function removeSpec(indexToRemove: number) {
             <div class="flex items-center justify-between">
                 <div>
                     <Label>Specifications</Label>
-                    <p class="text-xs text-muted-foreground">
-                        Billing period, startup cost, contract duration — any
+                    <p class="text-xs text-foreground">
+                        Billing period, startup cost, contract duration - any
                         key/value pair.
                     </p>
                 </div>
@@ -160,7 +160,7 @@ function removeSpec(indexToRemove: number) {
                 </Button>
             </div>
 
-            <p v-if="specs.length === 0" class="text-sm text-muted-foreground">
+            <p v-if="specs.length === 0" class="text-sm text-foreground">
                 No specifications yet.
             </p>
 

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Flat list of tags — deliberately not hierarchical (SPEC §3).
+        // Flat list of tags - deliberately not hierarchical (SPEC §3).
         Schema::create('product_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();

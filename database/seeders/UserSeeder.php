@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Hash;
  * Seeds exactly the two users this system will ever have (SPEC §3).
  *
  * There is no public registration route, so this seeder is the only way an
- * account comes into existence. Idempotent — safe to re-run on deploy.
+ * account comes into existence. Idempotent - safe to re-run on deploy.
  */
 class UserSeeder extends Seeder
 {

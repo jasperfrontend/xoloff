@@ -74,7 +74,7 @@ class ProductCategoryCrudTest extends TestCase
     }
 
     /**
-     * Deleting a tag must never destroy catalog data — the foreign key nulls
+     * Deleting a tag must never destroy catalog data - the foreign key nulls
      * the reference instead of cascading.
      */
     public function test_deleting_a_category_keeps_its_products_but_uncategorises_them()

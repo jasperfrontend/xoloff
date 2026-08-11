@@ -103,8 +103,8 @@ const billingAddress = ref(props.customer?.billing_address ?? '');
                     </SelectItem>
                 </SelectContent>
             </Select>
-            <p class="text-xs text-muted-foreground">
-                Determines which VAT treatment is appropriate — you still pick
+            <p class="text-xs text-foreground">
+                Determines which VAT treatment is appropriate - you still pick
                 the tax class by hand on each quote.
             </p>
             <InputError :message="errors.country" />

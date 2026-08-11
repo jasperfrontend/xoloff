@@ -50,7 +50,7 @@ defineOptions({
                     <tr v-if="products.length === 0">
                         <td
                             colspan="6"
-                            class="px-4 py-8 text-center text-muted-foreground"
+                            class="px-4 py-8 text-center text-foreground"
                         >
                             No products yet.
                         </td>
@@ -63,21 +63,21 @@ defineOptions({
                         <td class="px-4 py-3">
                             <Link
                                 :href="ProductController.edit(product.id).url"
-                                class="font-medium underline-offset-4 hover:underline"
+                                class="cursor-pointer font-medium underline-offset-4 hover:underline"
                             >
                                 {{ product.name }}
                             </Link>
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{ product.category?.name ?? '—' }}
+                        <td class="px-4 py-3 text-foreground">
+                            {{ product.category?.name ?? '-' }}
                         </td>
                         <td class="px-4 py-3 tabular-nums">
                             € {{ product.price_ex_vat }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
-                            {{ product.tax_class?.name ?? '—' }}
+                        <td class="px-4 py-3 text-foreground">
+                            {{ product.tax_class?.name ?? '-' }}
                         </td>
-                        <td class="px-4 py-3 text-muted-foreground">
+                        <td class="px-4 py-3 text-foreground">
                             {{ product.specs_count }}
                         </td>
                         <td class="px-4 py-3 text-right">

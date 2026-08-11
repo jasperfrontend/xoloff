@@ -43,7 +43,7 @@ class TaxClassCrudTest extends TestCase
     }
 
     /**
-     * Zero is a legitimate rate — reverse charge for non-EU customers depends
+     * Zero is a legitimate rate - reverse charge for non-EU customers depends
      * on it, so it must never be rejected as "empty".
      */
     public function test_a_zero_percent_rate_is_accepted()

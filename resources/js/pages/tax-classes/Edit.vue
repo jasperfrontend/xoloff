@@ -62,8 +62,8 @@ defineOptions({
                     :default-value="taxClass.percentage"
                     required
                 />
-                <p class="text-xs text-muted-foreground">
-                    Changing this does not alter quotes already saved — line
+                <p class="text-xs text-foreground">
+                    Changing this does not alter quotes already saved - line
                     items carry their own tax class.
                 </p>
                 <InputError :message="errors.percentage" />

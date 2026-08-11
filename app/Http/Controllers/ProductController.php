@@ -75,7 +75,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Specs are replaced wholesale rather than diffed — the list is short and
+     * Specs are replaced wholesale rather than diffed - the list is short and
      * order matters, so rewriting it is simpler and avoids stale rows.
      *
      * @param  array<int, array{key: string, value: string}>  $specs

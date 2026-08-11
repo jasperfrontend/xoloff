@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
 
-            // numeric(12,2) — exact decimal, never a float. This is the catalog
+            // numeric(12,2) - exact decimal, never a float. This is the catalog
             // default that seeds quote_line_items.unit_price_ex_vat in M2.
             $table->decimal('price_ex_vat', 12, 2);
 
