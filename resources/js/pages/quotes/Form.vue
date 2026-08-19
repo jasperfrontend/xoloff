@@ -102,9 +102,7 @@ function toPayload(): QuoteContent {
  */
 const totals = ref<CalculatedQuote | null>(props.initialTotals ?? null);
 
-const previewRequest = useHttp<QuoteContent, CalculatedQuote>(() =>
-    toPayload(),
-);
+const previewRequest = useHttp<QuoteContent, CalculatedQuote>(toPayload());
 
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -113,11 +111,24 @@ function refreshTotals() {
 
     previewTimer = setTimeout(async () => {
         try {
-            totals.value = await previewRequest.post(preview().url);
+            // transform runs at submit time. The data passed to useHttp is only
+            // an initial snapshot, so without this every request would send the
+            // empty payload the builder started with.
+            const calculated = await previewRequest
+                .transform(() => toPayload())
+                .post(preview().url);
+
+            // A failed validation resolves with no response rather than
+            // throwing, so this has to be checked instead of assigned blindly.
+            // Choosing a discount type before typing its value is a normal
+            // halfway state, and it should not blank the panel.
+            if (calculated) {
+                totals.value = calculated;
+            }
         } catch {
-            // A rejected preview means the content is not yet valid. The last
-            // good totals stay on screen rather than flashing an error at
-            // someone who is still typing.
+            // Same reasoning for a request that does throw: the last good
+            // totals stay on screen rather than flashing at someone who is
+            // still typing.
         }
     }, 300);
 }
