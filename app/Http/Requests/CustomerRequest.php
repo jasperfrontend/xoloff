@@ -21,4 +21,20 @@ class CustomerRequest extends FormRequest
             'country' => ['required', 'string', Rule::in(array_keys(Config::array('xoloff.countries')))],
         ];
     }
+
+    /**
+     * Named as the form labels them.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'company_name' => __('company name'),
+            'contact_person' => __('contact person'),
+            'email' => __('email address'),
+            'billing_address' => __('billing address'),
+            'country' => __('country'),
+        ];
+    }
 }

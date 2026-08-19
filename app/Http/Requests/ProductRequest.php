@@ -23,4 +23,22 @@ class ProductRequest extends FormRequest
             'specs.*.value' => ['required', 'string', 'max:255'],
         ];
     }
+
+    /**
+     * Named as the form labels them. Without this the spec rows report as
+     * "specs.0.key", which is the shape of the payload rather than anything on
+     * screen.
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'price_ex_vat' => __('price excluding VAT'),
+            'tax_class_id' => __('default tax class'),
+            'category_id' => __('category'),
+            'specs.*.key' => __('specification name'),
+            'specs.*.value' => __('specification value'),
+        ];
+    }
 }
