@@ -31,6 +31,8 @@ class ClosedAccessTest extends TestCase
             'categories create' => ['product-categories.create'],
             'tax classes index' => ['tax-classes.index'],
             'tax classes create' => ['tax-classes.create'],
+            'quotes index' => ['quotes.index'],
+            'quotes create' => ['quotes.create'],
             'profile settings' => ['profile.edit'],
         ];
     }

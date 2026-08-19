@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property int $id
+ * @property int $customer_id
+ * @property-read Customer $customer
+ * @property-read QuoteVersion|null $currentVersion
+ */
 class Quote extends Model
 {
     /** @use HasFactory<QuoteFactory> */

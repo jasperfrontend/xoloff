@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\DiscountType;
 use App\Models\QuoteLineItem;
 use App\Models\QuoteVersion;
 use App\Models\TaxClass;
 use App\Support\Quotes\CalculatedQuote;
 use App\Support\Quotes\QuoteCalculator;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class QuoteCalculatorTest extends TestCase
@@ -280,6 +283,42 @@ class QuoteCalculatorTest extends TestCase
         $result = $this->calculate($version);
 
         $this->assertLinesSumToSubtotal($result);
+    }
+
+    public function test_it_issues_no_queries_when_the_relations_are_already_set()
+    {
+        $taxClass = TaxClass::factory()->create(['percentage' => 21.00]);
+
+        // Exactly what the live preview builds: models that were never saved,
+        // with their relations set by hand.
+        $version = new QuoteVersion(['discount_type' => DiscountType::Percentage, 'discount_value' => 10]);
+
+        $lineItems = new EloquentCollection(array_map(function () use ($taxClass): QuoteLineItem {
+            $lineItem = new QuoteLineItem([
+                'name' => 'Line',
+                'quantity' => 1,
+                'unit_price_ex_vat' => 10.00,
+                'tax_class_id' => $taxClass->id,
+            ]);
+
+            $lineItem->setRelation('taxClass', $taxClass);
+
+            return $lineItem;
+        }, range(1, 20)));
+
+        $version->setRelation('lineItems', $lineItems);
+
+        DB::enableQueryLog();
+
+        $result = (new QuoteCalculator)->calculate($version);
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        // A single lazy load per line would be twenty queries here, and would
+        // make the preview endpoint quietly quadratic as lines are added.
+        $this->assertSame([], $queries);
+        $this->assertSame('180.00', $result->subtotal);
     }
 
     /**

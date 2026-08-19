@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import {
     BookOpen,
     Building2,
+    FileText,
     FolderGit2,
     LayoutGrid,
     Package,
@@ -26,6 +27,7 @@ import { dashboard } from '@/routes';
 import { index as customersIndex } from '@/routes/customers';
 import { index as categoriesIndex } from '@/routes/product-categories';
 import { index as productsIndex } from '@/routes/products';
+import { index as quotesIndex } from '@/routes/quotes';
 import { index as taxClassesIndex } from '@/routes/tax-classes';
 import type { NavItem } from '@/types';
 
@@ -34,6 +36,11 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Quotes',
+        href: quotesIndex(),
+        icon: FileText,
     },
     {
         title: 'Customers',

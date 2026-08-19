@@ -55,6 +55,15 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): RedirectResponse
     {
+        // The foreign key restricts this, because quotes are financial records
+        // and neither orphaning nor cascading them is acceptable. Explain that
+        // rather than letting the database exception surface as a 500.
+        if ($customer->quotes()->exists()) {
+            return back()->withErrors([
+                'customer' => __('This customer still has one or more quotes.'),
+            ]);
+        }
+
         $customer->delete();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Customer deleted.')]);

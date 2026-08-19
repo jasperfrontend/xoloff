@@ -3,6 +3,9 @@
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\QuotePreviewController;
+use App\Http\Controllers\QuoteVersionController;
 use App\Http\Controllers\TaxClassController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +23,20 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('product-categories', ProductCategoryController::class)->except(['show']);
     Route::resource('tax-classes', TaxClassController::class)->except(['show']);
     Route::resource('products', ProductController::class)->except(['show']);
+
+    // Quote builder (SPEC §5). No `show` either: editing is the only view of a
+    // quote there is until M3 adds the PDF.
+    Route::resource('quotes', QuoteController::class)->except(['show']);
+
+    // Totals for content that has not been saved, so the builder can show a
+    // running total without reimplementing the calculation engine in the
+    // browser.
+    Route::post('quotes/preview', QuotePreviewController::class)->name('quotes.preview');
+
+    // The explicit "Save as new version" action. Editing a quote otherwise
+    // saves over the current version (SPEC §3).
+    Route::post('quotes/{quote}/versions', [QuoteVersionController::class, 'store'])
+        ->name('quotes.versions.store');
 });
 
 require __DIR__.'/settings.php';
