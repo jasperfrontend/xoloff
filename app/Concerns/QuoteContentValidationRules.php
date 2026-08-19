@@ -37,6 +37,44 @@ trait QuoteContentValidationRules
     }
 
     /**
+     * Without these, a failure reads "The line_items.0.discount_value field is
+     * required when line_items.0.discount_type is present", which is the shape
+     * of the payload rather than anything a person would recognise on screen.
+     *
+     * @return array<string, string>
+     */
+    protected function quoteContentAttributes(): array
+    {
+        return [
+            'discount_type' => __('quote discount'),
+            'discount_value' => __('quote discount amount'),
+            'rounding_override' => __('rounding override'),
+            'line_items.*.product_id' => __('product'),
+            'line_items.*.name' => __('description'),
+            'line_items.*.quantity' => __('quantity'),
+            'line_items.*.unit_price_ex_vat' => __('unit price'),
+            'line_items.*.tax_class_id' => __('tax class'),
+            'line_items.*.discount_type' => __('line discount'),
+            'line_items.*.discount_value' => __('line discount amount'),
+        ];
+    }
+
+    /**
+     * Choosing a discount type and leaving its amount empty is the single most
+     * likely way to get stuck here, so it says what to do rather than restating
+     * the rule that was broken.
+     *
+     * @return array<string, string>
+     */
+    protected function quoteContentMessages(): array
+    {
+        return [
+            'discount_value.required_with' => __('Enter an amount for the quote discount, or set it back to no discount.'),
+            'line_items.*.discount_value.required_with' => __('Enter an amount for this line discount, or set it back to no discount.'),
+        ];
+    }
+
+    /**
      * A percentage over 100 would discount past zero, so it is rejected rather
      * than clamped. Fixed amounts are left to the engine, which caps them at
      * whatever they apply to. Checking those here would mean reimplementing the

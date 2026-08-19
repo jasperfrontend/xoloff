@@ -164,6 +164,68 @@ class QuotePreviewTest extends TestCase
             ->assertJsonValidationErrors('discount_value');
     }
 
+    public function test_it_names_fields_the_way_the_builder_does()
+    {
+        $taxClass = TaxClass::factory()->create();
+
+        $response = $this->actingAs(User::factory()->create())
+            ->postJson(route('quotes.preview'), [
+                'discount_type' => DiscountType::Percentage->value,
+                'line_items' => [
+                    [
+                        'name' => 'Line',
+                        'quantity' => 1,
+                        'unit_price_ex_vat' => 10.00,
+                        'tax_class_id' => $taxClass->id,
+                        'discount_type' => DiscountType::Percentage->value,
+                    ],
+                ],
+            ])
+            ->assertUnprocessable();
+
+        // These messages are shown verbatim next to the inputs, so they must
+        // not leak the shape of the payload.
+        $errors = $response->json('errors');
+
+        $this->assertSame(
+            'Enter an amount for the quote discount, or set it back to no discount.',
+            $errors['discount_value'][0],
+        );
+
+        $this->assertSame(
+            'Enter an amount for this line discount, or set it back to no discount.',
+            $errors['line_items.0.discount_value'][0],
+        );
+    }
+
+    public function test_it_never_shows_a_raw_field_path_to_a_person()
+    {
+        $taxClass = TaxClass::factory()->create();
+
+        $response = $this->actingAs(User::factory()->create())
+            ->postJson(route('quotes.preview'), [
+                'line_items' => [
+                    [
+                        'name' => '',
+                        'quantity' => 'not a number',
+                        'unit_price_ex_vat' => -5,
+                        'tax_class_id' => $taxClass->id,
+                    ],
+                ],
+            ])
+            ->assertUnprocessable();
+
+        /** @var array<string, array<int, string>> $errors */
+        $errors = $response->json('errors');
+
+        foreach ($errors as $messages) {
+            foreach ($messages as $message) {
+                $this->assertStringNotContainsString('line_items.', $message);
+                $this->assertStringNotContainsString('_', $message);
+            }
+        }
+    }
+
     public function test_an_empty_builder_previews_as_zero()
     {
         $this->actingAs(User::factory()->create())

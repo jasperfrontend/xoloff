@@ -21,6 +21,22 @@ class QuoteRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return $this->quoteContentAttributes();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return $this->quoteContentMessages();
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(fn (Validator $validator) => $this->rejectPercentagesOverOneHundred($validator));
