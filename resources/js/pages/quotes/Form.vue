@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Link, useForm, useHttp } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { Plus, X } from '@lucide/vue';
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useQuoteTotals } from '@/composables/useQuoteTotals';
 import QuoteTotals from '@/pages/quotes/Totals.vue';
 import { index, preview } from '@/routes/quotes';
 import type {
@@ -100,38 +101,11 @@ function toPayload(): QuoteContent {
  * Totals come from the server so the browser never holds a second opinion
  * about the money. SPEC §5 is implemented once, in PHP.
  */
-const totals = ref<CalculatedQuote | null>(props.initialTotals ?? null);
-
-const previewRequest = useHttp<QuoteContent, CalculatedQuote>(toPayload());
-
-let previewTimer: ReturnType<typeof setTimeout> | undefined;
-
-function refreshTotals() {
-    clearTimeout(previewTimer);
-
-    previewTimer = setTimeout(async () => {
-        try {
-            // transform runs at submit time. The data passed to useHttp is only
-            // an initial snapshot, so without this every request would send the
-            // empty payload the builder started with.
-            const calculated = await previewRequest
-                .transform(() => toPayload())
-                .post(preview().url);
-
-            // A failed validation resolves with no response rather than
-            // throwing, so this has to be checked instead of assigned blindly.
-            // Choosing a discount type before typing its value is a normal
-            // halfway state, and it should not blank the panel.
-            if (calculated) {
-                totals.value = calculated;
-            }
-        } catch {
-            // Same reasoning for a request that does throw: the last good
-            // totals stay on screen rather than flashing at someone who is
-            // still typing.
-        }
-    }, 300);
-}
+const {
+    totals,
+    request: previewRequest,
+    refresh: refreshTotals,
+} = useQuoteTotals(preview().url, toPayload, props.initialTotals ?? null);
 
 watch(
     () => [
@@ -143,8 +117,6 @@ watch(
     refreshTotals,
     { deep: true },
 );
-
-onBeforeUnmount(() => clearTimeout(previewTimer));
 
 function addLineItem() {
     form.line_items.push({
