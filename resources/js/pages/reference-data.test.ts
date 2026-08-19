@@ -86,7 +86,7 @@ describe('tax-classes', () => {
         });
 
         expect(wrapper.text()).toContain('Standard 21%');
-        expect(wrapper.text()).toContain('21.00%');
+        expect(wrapper.text()).toContain('21,00%');
     });
 
     it('says so when there are none', () => {

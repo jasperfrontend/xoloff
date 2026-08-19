@@ -19,6 +19,16 @@ export function useQuoteTotals(
 ) {
     const totals = ref<CalculatedQuote | null>(initialTotals);
 
+    /**
+     * Set whenever the totals on screen no longer describe what is in the form,
+     * which happens as soon as a request is refused. Holding the last good
+     * figures is right, but doing it quietly is not: an incomplete discount
+     * would otherwise look exactly like a discount that had been applied.
+     */
+    const stale = ref(false);
+
+    const errors = ref<Record<string, string>>({});
+
     const request = useHttp<QuoteContent, CalculatedQuote>(payload());
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -35,20 +45,25 @@ export function useQuoteTotals(
                 // with.
                 const calculated = await request.transform(payload).post(url);
 
-                // A failed validation resolves with no response instead of
-                // throwing. Choosing a discount type before typing its value is
-                // a normal halfway state, and it should leave the last good
-                // totals on screen rather than blanking them.
+                // A refused request resolves with no response instead of
+                // throwing, so this has to be checked rather than assigned.
                 if (calculated) {
                     totals.value = calculated;
+                    stale.value = false;
+                    errors.value = {};
+
+                    return;
                 }
+
+                stale.value = true;
+                errors.value = { ...request.errors } as Record<string, string>;
             } catch {
-                // Same reasoning for a request that does throw.
+                stale.value = true;
             }
         }, delay);
     }
 
     tryOnScopeDispose(() => clearTimeout(timer));
 
-    return { totals, request, refresh };
+    return { totals, stale, errors, request, refresh };
 }

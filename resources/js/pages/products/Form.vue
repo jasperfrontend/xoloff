@@ -13,6 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { formatPercentage, normalizeAmount } from '@/lib/money';
 import { index } from '@/routes/products';
 
 interface Spec {
@@ -46,6 +47,16 @@ const props = defineProps<{
     product?: Product;
     submitLabel: string;
 }>();
+
+/**
+ * Settles a half-typed "90,5" into "90.50", so what is shown, sent and saved
+ * are the same number.
+ */
+const price = ref(props.product?.price_ex_vat ?? '');
+
+function settlePrice() {
+    price.value = normalizeAmount(price.value);
+}
 
 // Specs are a free-form key/value list, replaced wholesale on save.
 const specs = ref<Spec[]>(
@@ -83,12 +94,13 @@ function removeSpec(indexToRemove: number) {
             <Label for="price_ex_vat">Price excluding VAT</Label>
             <Input
                 id="price_ex_vat"
+                v-model="price"
                 name="price_ex_vat"
                 type="number"
                 step="0.01"
                 min="0"
-                :default-value="product?.price_ex_vat"
                 required
+                @blur="settlePrice"
             />
             <InputError :message="errors.price_ex_vat" />
         </div>
@@ -108,7 +120,9 @@ function removeSpec(indexToRemove: number) {
                         :key="taxClass.id"
                         :value="taxClass.id.toString()"
                     >
-                        {{ taxClass.name }} ({{ taxClass.percentage }}%)
+                        {{ taxClass.name }} ({{
+                            formatPercentage(taxClass.percentage)
+                        }})
                     </SelectItem>
                 </SelectContent>
             </Select>

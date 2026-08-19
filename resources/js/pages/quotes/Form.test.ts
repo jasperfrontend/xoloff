@@ -199,6 +199,47 @@ describe('quotes/Form', () => {
         expect(previews[0].data.line_items as unknown[]).toHaveLength(1);
     });
 
+    it('settles a half-typed amount into two decimals when the field is left', async () => {
+        const wrapper = build();
+
+        await chooseInSelect(wrapper, 1, 'fixed');
+        await wrapper.vm.$nextTick();
+
+        const amount = wrapper.find('#discount_value');
+
+        // A real browser in a Dutch locale accepts "182,7" here and reports
+        // "182.7" as the value. jsdom has no locale handling and simply
+        // discards the comma, so the canonical form is used instead. The comma
+        // itself is covered directly in the normalizeAmount tests.
+        await amount.setValue('182.7');
+        await amount.trigger('blur');
+        await wrapper.find('form').trigger('submit');
+
+        // What is shown, what is sent and what is saved have to be the same
+        // number, and the server splits on the full stop.
+        expect(submissions[0].data.discount_value).toBe('182.70');
+    });
+
+    it('keeps the rounding override in a card of its own', async () => {
+        const wrapper = build();
+
+        await chooseInSelect(wrapper, 1, 'percentage');
+        await wrapper.vm.$nextTick();
+
+        const discountCard = wrapper
+            .find('#discount_value')
+            .element.closest('.rounded-xl');
+        const overrideCard = wrapper
+            .find('#rounding_override')
+            .element.closest('.rounded-xl');
+
+        // Sharing a card meant the override moved the moment a discount type
+        // was chosen, leaving two number inputs whose owners were unclear.
+        expect(discountCard).not.toBeNull();
+        expect(overrideCard).not.toBeNull();
+        expect(discountCard).not.toBe(overrideCard);
+    });
+
     it('hides the discount amount until a discount type is chosen', async () => {
         const wrapper = build();
 

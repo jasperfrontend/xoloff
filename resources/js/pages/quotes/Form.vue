@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useQuoteTotals } from '@/composables/useQuoteTotals';
+import { formatMoney, formatPercentage, normalizeAmount } from '@/lib/money';
 import QuoteTotals from '@/pages/quotes/Totals.vue';
 import { index, preview } from '@/routes/quotes';
 import type {
@@ -31,19 +32,29 @@ interface QuoteFormData extends QuoteContent {
 }
 
 /**
- * Optional money values are held as empty strings rather than null, because
- * that is what an empty number input produces. They are converted back to null
- * in toPayload before anything is sent.
+ * What the inputs hold while editing, which is not what the server receives.
+ *
+ * An empty number input reads as an empty string, and Vue casts a filled one
+ * to an actual number, so every money field here is one or the other. toPayload
+ * settles them into the canonical decimal strings the server parses, or null
+ * where the field was left blank.
  */
-interface LineItemState extends Omit<QuoteLineItem, 'discount_value'> {
-    discount_value: string;
+type AmountInput = string | number;
+
+interface LineItemState extends Omit<
+    QuoteLineItem,
+    'discount_value' | 'quantity' | 'unit_price_ex_vat'
+> {
+    quantity: AmountInput;
+    unit_price_ex_vat: AmountInput;
+    discount_value: AmountInput;
 }
 
 interface FormState {
     customer_id: number | null;
     discount_type: DiscountType | null;
-    discount_value: string;
-    rounding_override: string;
+    discount_value: AmountInput;
+    rounding_override: AmountInput;
     line_items: LineItemState[];
 }
 
@@ -76,23 +87,31 @@ const form = useForm<FormState>({
         })) ?? [],
 });
 
-function nullIfBlank(value: string): string | null {
-    return value === '' ? null : value;
+/**
+ * An empty input means "not set", which the server expects as null rather than
+ * an empty string, and anything else has to arrive as a canonical decimal
+ * string so "182,7", 182.7 and "182.70" are all sent as the same number.
+ */
+function amountForServer(value: AmountInput): string | null {
+    const settled = normalizeAmount(value);
+
+    return settled === '' ? null : settled;
 }
 
 /**
- * An empty input means "not set", which the server expects as null rather than
- * an empty string. Doing it here keeps the save and the live preview sending
- * exactly the same shape.
+ * Doing this here keeps the save and the live preview sending exactly the same
+ * shape, so what is previewed is what gets stored.
  */
 function toPayload(): QuoteContent {
     return {
         discount_type: form.discount_type,
-        discount_value: nullIfBlank(form.discount_value),
-        rounding_override: nullIfBlank(form.rounding_override),
+        discount_value: amountForServer(form.discount_value),
+        rounding_override: amountForServer(form.rounding_override),
         line_items: form.line_items.map((lineItem) => ({
             ...lineItem,
-            discount_value: nullIfBlank(lineItem.discount_value),
+            quantity: normalizeAmount(lineItem.quantity),
+            unit_price_ex_vat: normalizeAmount(lineItem.unit_price_ex_vat),
+            discount_value: amountForServer(lineItem.discount_value),
         })),
     };
 }
@@ -103,9 +122,40 @@ function toPayload(): QuoteContent {
  */
 const {
     totals,
+    stale: totalsAreStale,
+    errors: previewErrors,
     request: previewRequest,
     refresh: refreshTotals,
 } = useQuoteTotals(preview().url, toPayload, props.initialTotals ?? null);
+
+/**
+ * Submitting reports errors through the form; editing reports them through the
+ * live preview. Both describe the same fields, so the builder shows whichever
+ * it has.
+ */
+function errorFor(field: string): string | undefined {
+    // Errors for line items arrive under dot paths such as
+    // "line_items.0.discount_value", which the form's own error type does not
+    // model, so it is read as the flat bag it actually is.
+    const formErrors = form.errors as Record<string, string | undefined>;
+
+    return formErrors[field] ?? previewErrors.value[field];
+}
+
+/**
+ * Number inputs happily hold a half-typed "182,7". Settling them on blur keeps
+ * what is displayed, what is sent and what is saved identical.
+ */
+function settleLineAmount(
+    lineItem: LineItemState,
+    key: 'unit_price_ex_vat' | 'discount_value',
+): void {
+    lineItem[key] = normalizeAmount(lineItem[key]);
+}
+
+function settleQuoteAmount(key: 'discount_value' | 'rounding_override'): void {
+    form[key] = normalizeAmount(form[key]);
+}
 
 watch(
     () => [
@@ -162,7 +212,7 @@ function removeLineItem(indexToRemove: number) {
 
 function clearDiscount(target: {
     discount_type: DiscountType | null;
-    discount_value: string;
+    discount_value: AmountInput;
 }) {
     if (target.discount_type === null) {
         target.discount_value = '';
@@ -270,8 +320,10 @@ function saveAsNewVersion() {
                                         :value="product.id.toString()"
                                         class="cursor-pointer"
                                     >
-                                        {{ product.name }} (€
-                                        {{ product.price_ex_vat }})
+                                        {{ product.name }}
+                                        ({{
+                                            formatMoney(product.price_ex_vat)
+                                        }})
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -338,6 +390,12 @@ function saveAsNewVersion() {
                                 step="0.01"
                                 min="0"
                                 required
+                                @blur="
+                                    settleLineAmount(
+                                        lineItem,
+                                        'unit_price_ex_vat',
+                                    )
+                                "
                             />
                             <InputError
                                 :message="
@@ -371,9 +429,12 @@ function saveAsNewVersion() {
                                         :value="taxClass.id.toString()"
                                         class="cursor-pointer"
                                     >
-                                        {{ taxClass.name }} ({{
-                                            taxClass.percentage
-                                        }}%)
+                                        {{ taxClass.name }}
+                                        ({{
+                                            formatPercentage(
+                                                taxClass.percentage,
+                                            )
+                                        }})
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -451,12 +512,15 @@ function saveAsNewVersion() {
                                         ? 100
                                         : undefined
                                 "
+                                @blur="
+                                    settleLineAmount(lineItem, 'discount_value')
+                                "
                             />
                             <InputError
                                 :message="
-                                    form.errors[
-                                        `line_items.${lineIndex}.discount_value`
-                                    ]
+                                    errorFor(
+                                        `line_items.${lineIndex}.discount_value`,
+                                    )
                                 "
                             />
                         </div>
@@ -523,10 +587,19 @@ function saveAsNewVersion() {
                                 ? 100
                                 : undefined
                         "
+                        @blur="settleQuoteAmount('discount_value')"
                     />
-                    <InputError :message="form.errors.discount_value" />
+                    <InputError :message="errorFor('discount_value')" />
                 </div>
+            </div>
 
+            <!--
+                A card of its own, deliberately. Sharing a grid with the quote
+                discount meant this input moved as soon as a discount type was
+                chosen and its amount field appeared, leaving two number inputs
+                whose owners were not obvious.
+            -->
+            <div class="grid max-w-md gap-3 rounded-xl border p-4">
                 <div class="grid gap-2">
                     <Label for="rounding_override">Rounding override</Label>
                     <Input
@@ -536,13 +609,14 @@ function saveAsNewVersion() {
                         step="0.01"
                         min="0"
                         placeholder="Leave empty to use the calculated total"
+                        @blur="settleQuoteAmount('rounding_override')"
                     />
                     <p class="text-xs text-foreground">
                         Replaces the total outright. There is no reconciliation
                         line and the calculated total is not shown to the
                         customer.
                     </p>
-                    <InputError :message="form.errors.rounding_override" />
+                    <InputError :message="errorFor('rounding_override')" />
                 </div>
             </div>
 
@@ -575,6 +649,7 @@ function saveAsNewVersion() {
         <QuoteTotals
             :totals="totals"
             :calculating="previewRequest.processing"
+            :stale="totalsAreStale"
         />
     </div>
 </template>

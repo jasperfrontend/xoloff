@@ -15,6 +15,9 @@ vi.mock('@/components/ui/select', async () =>
     (await import('@/test-support/ui')).selectStub(),
 );
 
+/** formatMoney joins the symbol to the amount with a non-breaking space. */
+const NBSP = ' ';
+
 const options = {
     customers: [{ id: 1, company_name: 'Acme BV' }],
     products: [
@@ -81,7 +84,7 @@ describe('quotes/Index', () => {
 
         expect(wrapper.findAll('tbody tr')).toHaveLength(2);
         expect(wrapper.text()).toContain('Acme BV');
-        expect(wrapper.text()).toContain('€ 217.80');
+        expect(wrapper.text()).toContain(`€${NBSP}217,80`);
     });
 
     it('says so when there are none', () => {
@@ -141,9 +144,9 @@ describe('quotes/Totals', () => {
             props: { totals: totals(), calculating: false },
         });
 
-        expect(wrapper.text()).toContain('VAT 21.00%');
-        expect(wrapper.text()).toContain('€ 37.80');
-        expect(wrapper.text()).toContain('€ 217.80');
+        expect(wrapper.text()).toContain('VAT 21,00%');
+        expect(wrapper.text()).toContain(`€${NBSP}37,80`);
+        expect(wrapper.text()).toContain(`€${NBSP}217,80`);
     });
 
     it('hides the discount rows when nothing was discounted', () => {
@@ -163,7 +166,7 @@ describe('quotes/Totals', () => {
         });
 
         expect(wrapper.text()).toContain('Quote discount');
-        expect(wrapper.text()).toContain('- € 18.00');
+        expect(wrapper.text()).toContain(`- €${NBSP}18,00`);
     });
 
     it('says plainly when the total was overridden', () => {
@@ -177,7 +180,25 @@ describe('quotes/Totals', () => {
         // The calculated figure is reported but is explicitly not the total,
         // which is what SPEC §5 asks for.
         expect(wrapper.text()).toContain('Overridden');
-        expect(wrapper.text()).toContain('217.80');
+        expect(wrapper.text()).toContain('217,80');
+    });
+
+    it('warns when the figures no longer describe the form', () => {
+        const wrapper = mount(QuoteTotals, {
+            props: { totals: totals(), calculating: false, stale: true },
+        });
+
+        // Holding the previous figures is deliberate, but doing it silently
+        // made an incomplete discount look like an applied one.
+        expect(wrapper.text()).toContain('out of date');
+    });
+
+    it('says nothing about staleness while the figures are current', () => {
+        const wrapper = mount(QuoteTotals, {
+            props: { totals: totals(), calculating: false },
+        });
+
+        expect(wrapper.text()).not.toContain('out of date');
     });
 
     it('indicates when a calculation is in flight', () => {

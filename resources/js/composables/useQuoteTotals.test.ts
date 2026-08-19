@@ -9,6 +9,8 @@ const sentPayloads: QuoteContent[] = [];
 
 let nextResponse: CalculatedQuote | undefined;
 
+let nextErrors: Record<string, string> = {};
+
 /**
  * A faithful stand-in for useHttp: it keeps the data it was given at setup and
  * only consults the transform callback when a request is made. A composable
@@ -26,10 +28,13 @@ vi.mock('@inertiajs/vue3', () => ({
 
                 return this;
             },
+            errors: nextErrors,
             post() {
                 sentPayloads.push(
                     transformer ? transformer(initialData) : initialData,
                 );
+
+                this.errors = nextErrors;
 
                 return Promise.resolve(nextResponse);
             },
@@ -74,6 +79,7 @@ describe('useQuoteTotals', () => {
         vi.useFakeTimers();
         sentPayloads.length = 0;
         nextResponse = undefined;
+        nextErrors = {};
     });
 
     afterEach(() => {
@@ -95,6 +101,65 @@ describe('useQuoteTotals', () => {
 
         expect(sentPayloads).toHaveLength(1);
         expect(sentPayloads[0].line_items).toHaveLength(2);
+    });
+
+    it('says the totals are stale when a request is refused', async () => {
+        const current = content(1);
+
+        nextResponse = totalsFixture('108.90');
+
+        const { totals, stale, errors, refresh } = useQuoteTotals(
+            '/quotes/preview',
+            () => current,
+        );
+
+        refresh();
+        await vi.runAllTimersAsync();
+
+        expect(stale.value).toBe(false);
+
+        // Picking a discount type and leaving its amount empty is refused by
+        // the server, and used to look exactly like a discount that had been
+        // applied: the figures simply stopped moving.
+        nextResponse = undefined;
+        nextErrors = {
+            discount_value: 'The discount value field is required.',
+        };
+
+        refresh();
+        await vi.runAllTimersAsync();
+
+        expect(stale.value).toBe(true);
+        expect(errors.value.discount_value).toContain('required');
+        expect(totals.value?.total).toBe('108.90');
+    });
+
+    it('stops being stale once the content adds up again', async () => {
+        const current = content(1);
+
+        nextResponse = undefined;
+        nextErrors = {
+            discount_value: 'The discount value field is required.',
+        };
+
+        const { stale, errors, refresh } = useQuoteTotals(
+            '/quotes/preview',
+            () => current,
+        );
+
+        refresh();
+        await vi.runAllTimersAsync();
+
+        expect(stale.value).toBe(true);
+
+        nextResponse = totalsFixture('196.02');
+        nextErrors = {};
+
+        refresh();
+        await vi.runAllTimersAsync();
+
+        expect(stale.value).toBe(false);
+        expect(errors.value).toEqual({});
     });
 
     it('keeps the last good totals when a request comes back empty', async () => {

@@ -14,6 +14,9 @@ vi.mock('@/components/ui/select', async () =>
     (await import('@/test-support/ui')).selectStub(),
 );
 
+/** formatMoney joins the symbol to the amount with a non-breaking space. */
+const NBSP = ' ';
+
 const taxClasses = [{ id: 3, name: 'Standard 21%', percentage: '21.00' }];
 const categories = [{ id: 5, name: 'Hosting' }];
 
@@ -56,7 +59,7 @@ describe('products/Index', () => {
         });
 
         expect(wrapper.text()).toContain('Managed hosting');
-        expect(wrapper.text()).toContain('€ 90.00');
+        expect(wrapper.text()).toContain(`€${NBSP}90,00`);
         expect(wrapper.text()).toContain('Standard 21%');
     });
 

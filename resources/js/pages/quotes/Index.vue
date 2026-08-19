@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import QuoteController from '@/actions/App/Http/Controllers/QuoteController';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import ResourceHeader from '@/components/ResourceHeader.vue';
+import { formatMoney } from '@/lib/money';
 import { index } from '@/routes/quotes';
 
 interface Quote {
@@ -77,7 +78,7 @@ defineOptions({
                             {{ quote.line_count }}
                         </td>
                         <td class="px-4 py-3 tabular-nums">
-                            € {{ quote.total }}
+                            {{ formatMoney(quote.total) }}
                         </td>
                         <td class="px-4 py-3 text-right">
                             <ConfirmDeleteButton

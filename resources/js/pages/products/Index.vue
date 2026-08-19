@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import ProductController from '@/actions/App/Http/Controllers/ProductController';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import ResourceHeader from '@/components/ResourceHeader.vue';
+import { formatMoney } from '@/lib/money';
 import { index } from '@/routes/products';
 
 interface Product {
@@ -72,7 +73,7 @@ defineOptions({
                             {{ product.category?.name ?? '-' }}
                         </td>
                         <td class="px-4 py-3 tabular-nums">
-                            € {{ product.price_ex_vat }}
+                            {{ formatMoney(product.price_ex_vat) }}
                         </td>
                         <td class="px-4 py-3 text-foreground">
                             {{ product.tax_class?.name ?? '-' }}
