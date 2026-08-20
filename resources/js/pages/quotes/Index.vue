@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import QuoteController from '@/actions/App/Http/Controllers/QuoteController';
+import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import ResourceHeader from '@/components/ResourceHeader.vue';
 import { formatMoney } from '@/lib/money';
@@ -71,8 +72,17 @@ defineOptions({
                         <td class="px-4 py-3 text-foreground">
                             {{ quote.customer_name }}
                         </td>
-                        <td class="px-4 py-3 text-foreground tabular-nums">
-                            {{ quote.version_number ?? '-' }}
+                        <td class="px-4 py-3 tabular-nums">
+                            <Link
+                                v-if="quote.version_number"
+                                :href="
+                                    QuoteVersionController.index(quote.id).url
+                                "
+                                class="cursor-pointer underline-offset-4 hover:underline"
+                            >
+                                V{{ quote.version_number }}
+                            </Link>
+                            <span v-else class="text-foreground">-</span>
                         </td>
                         <td class="px-4 py-3 text-foreground tabular-nums">
                             {{ quote.line_count }}

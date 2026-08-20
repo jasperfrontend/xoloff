@@ -40,6 +40,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('quotes/{quote}/versions', [QuoteVersionController::class, 'store'])
         ->name('quotes.versions.store');
 
+    // The history of a quote: browse it, read a superseded version, remove one
+    // (SPEC §6). There is no edit route, because rewriting a past version is
+    // what versioning exists to prevent.
+    Route::get('quotes/{quote}/versions', [QuoteVersionController::class, 'index'])
+        ->name('quotes.versions.index');
+    Route::get('quotes/{quote}/versions/{version}', [QuoteVersionController::class, 'show'])
+        ->name('quotes.versions.show');
+    Route::delete('quotes/{quote}/versions/{version}', [QuoteVersionController::class, 'destroy'])
+        ->name('quotes.versions.destroy');
+
     // The intro and footer carried by every quote (SPEC §3). Exactly two rows,
     // fixed by key, so this is an edit screen rather than a resource.
     Route::get('premade-texts', [PremadeTextController::class, 'edit'])->name('premade-texts.edit');

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
+import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import Heading from '@/components/Heading.vue';
+import { Button } from '@/components/ui/button';
 import QuoteForm from '@/pages/quotes/Form.vue';
 import { index, update } from '@/routes/quotes';
 import { store as storeVersion } from '@/routes/quotes/versions';
@@ -38,15 +40,23 @@ defineOptions({
     <Head :title="`Quote ${quote.id}`" />
 
     <div class="flex flex-col space-y-6 p-4">
-        <Heading
-            variant="small"
-            :title="`Quote ${quote.id}`"
-            :description="
-                quote.version_count > 1
-                    ? `Editing version ${quote.version_number} of ${quote.version_count}`
-                    : 'Saving overwrites this version unless you save as a new one'
-            "
-        />
+        <div class="flex items-start justify-between gap-4">
+            <Heading
+                variant="small"
+                :title="`Quote ${quote.id}`"
+                :description="
+                    quote.version_count > 1
+                        ? `Editing version ${quote.version_number} of ${quote.version_count}`
+                        : 'Saving overwrites this version unless you save as a new one'
+                "
+            />
+
+            <Button v-if="quote.version_count > 1" variant="secondary" as-child>
+                <Link :href="QuoteVersionController.index(props.quote.id).url">
+                    Version history
+                </Link>
+            </Button>
+        </div>
 
         <QuoteForm
             :customers="customers"

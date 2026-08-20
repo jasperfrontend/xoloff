@@ -46,7 +46,7 @@ const editor = useEditor({
     ],
     editorProps: {
         attributes: {
-            class: 'tiptap min-h-40 px-3 py-2 focus:outline-none',
+            class: 'rich-text min-h-40 px-3 py-2 focus:outline-none',
             'aria-label': props.label,
             ...(props.describedBy
                 ? { 'aria-describedby': props.describedBy }
@@ -229,53 +229,3 @@ const toolbar: ToolbarAction[] = [
         <EditorContent :editor="editor" />
     </div>
 </template>
-
-<style>
-/* The editor writes plain semantic HTML, which Tailwind's reset strips of every
-   visual difference. These rules put back just enough that what is typed here
-   resembles what comes out of the PDF template. */
-.tiptap :first-child {
-    margin-top: 0;
-}
-
-.tiptap p {
-    margin: 0.5rem 0;
-}
-
-.tiptap h2 {
-    margin: 1rem 0 0.5rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-}
-
-.tiptap h3 {
-    margin: 0.75rem 0 0.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.tiptap ul,
-.tiptap ol {
-    margin: 0.5rem 0;
-    padding-left: 1.25rem;
-}
-
-.tiptap ul {
-    list-style: disc;
-}
-
-.tiptap ol {
-    list-style: decimal;
-}
-
-.tiptap blockquote {
-    margin: 0.5rem 0;
-    border-left: 3px solid var(--border);
-    padding-left: 0.75rem;
-}
-
-.tiptap a {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-</style>

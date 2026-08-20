@@ -170,3 +170,63 @@
         @apply bg-background text-foreground;
     }
 }
+
+/*
+ * Content written in the quote text editor, wherever it is shown: inside the
+ * editor itself and on a saved version. Tailwind's reset strips semantic
+ * markup of every visual difference, so this puts back just enough that what
+ * is typed resembles what comes out of the PDF template.
+ *
+ * The tag list matches the allowlist in App\Support\Html\RichText - anything
+ * outside it never survives being saved, so it has nothing to style.
+ */
+@layer components {
+    .rich-text :first-child {
+        margin-top: 0;
+    }
+
+    .rich-text :last-child {
+        margin-bottom: 0;
+    }
+
+    .rich-text p {
+        margin: 0.5rem 0;
+    }
+
+    .rich-text h2 {
+        margin: 1rem 0 0.5rem;
+        font-size: 1.125rem;
+        font-weight: 600;
+    }
+
+    .rich-text h3 {
+        margin: 0.75rem 0 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .rich-text ul,
+    .rich-text ol {
+        margin: 0.5rem 0;
+        padding-left: 1.25rem;
+    }
+
+    .rich-text ul {
+        list-style: disc;
+    }
+
+    .rich-text ol {
+        list-style: decimal;
+    }
+
+    .rich-text blockquote {
+        margin: 0.5rem 0;
+        border-left: 3px solid var(--border);
+        padding-left: 0.75rem;
+    }
+
+    .rich-text a {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+}
