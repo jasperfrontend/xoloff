@@ -30,10 +30,11 @@ class Gotenberg
     /**
      * @param  string  $document  the page itself, which Gotenberg requires to be named index.html
      * @param  string|null  $footer  markup repeated at the foot of every page, which is how page numbers get there
+     * @param  array<string, string>  $margins  page margins keyed top, bottom, left, right, with units
      *
      * @throws PdfUnavailable
      */
-    public function render(string $document, ?string $footer = null): string
+    public function render(string $document, ?string $footer = null, array $margins = []): string
     {
         if (! $this->isConfigured()) {
             throw PdfUnavailable::notConfigured();
@@ -45,6 +46,13 @@ class Gotenberg
 
         if ($footer !== null) {
             $request = $request->attach('files', $footer, 'footer.html');
+        }
+
+        // Chromium's print API owns the page margins, so an @page rule in the
+        // document is ignored. Sending them here is the only way the printed
+        // page matches what the template was designed for.
+        foreach ($margins as $edge => $size) {
+            $request = $request->attach('margin'.ucfirst($edge), $size);
         }
 
         $username = config('services.gotenberg.username');

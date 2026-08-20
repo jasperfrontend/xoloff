@@ -28,10 +28,10 @@
             --tint: #f5f8f9;
         }
 
-        @page {
-            /* Room at the foot for the page numbers Gotenberg repeats there. */
-            margin: 18mm 16mm 24mm;
-        }
+        /* No @page margin rule here on purpose: Chromium's print API owns
+           the margins and ignores it, so declaring them twice would mean one
+           of the two was always a lie. They are sent to Gotenberg instead,
+           from QuotePdfController::MARGINS. */
 
         * {
             box-sizing: border-box;

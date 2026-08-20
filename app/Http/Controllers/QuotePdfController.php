@@ -20,6 +20,21 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class QuotePdfController extends Controller
 {
+    /**
+     * The page margins the quote template is designed around. They live here
+     * rather than in the template's CSS because Chromium's print API owns them
+     * and ignores an @page rule. The extra room at the foot is for the page
+     * numbers Gotenberg repeats there.
+     *
+     * @var array<string, string>
+     */
+    private const MARGINS = [
+        'top' => '18mm',
+        'bottom' => '24mm',
+        'left' => '16mm',
+        'right' => '16mm',
+    ];
+
     public function __construct(
         private readonly Gotenberg $gotenberg,
         private readonly QuoteCalculator $calculator,
@@ -66,7 +81,7 @@ class QuotePdfController extends Controller
         ])->render();
 
         try {
-            $pdf = $this->gotenberg->render($html, view('pdf.footer')->render());
+            $pdf = $this->gotenberg->render($html, view('pdf.footer')->render(), self::MARGINS);
         } catch (PdfUnavailable $exception) {
             // Shown rather than logged: whoever pressed Download needs to know
             // whether to wait, to fix something, or to give up.

@@ -102,6 +102,54 @@ class QuotePdfTest extends TestCase
             && str_contains($request->body(), 'class="totalPages"'));
     }
 
+    /**
+     * Chromium renders the footer document with a font size of zero unless
+     * every element carries an explicit one, so the page numbers come out
+     * present and invisible. That is how this shipped until it was rendered
+     * against the real container.
+     *
+     * A faked Gotenberg cannot see an invisible footer, so this asserts the
+     * one thing it can: that the markup still carries the sizes. It is a proxy
+     * for the real check, and it is here because the real check only ever
+     * happens when someone looks at a PDF.
+     */
+    public function test_the_page_numbers_carry_a_size_chromium_will_honour()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
+
+        $footer = view('pdf.footer')->render();
+
+        // Every element between the body and the numbers themselves.
+        $this->assertSame(4, substr_count($footer, 'font-size: 9px'));
+        $this->assertStringContainsString('class="pageNumber" style="font-size: 9px;"', $footer);
+        $this->assertStringContainsString('class="totalPages" style="font-size: 9px;"', $footer);
+    }
+
+    /**
+     * Chromium's print API owns the page margins and ignores an @page rule in
+     * the document, so the template's layout only holds if they are declared
+     * in the request itself.
+     */
+    public function test_the_page_margins_are_declared_rather_than_left_to_css()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
+
+        Http::assertSent(function (Request $request): bool {
+            $body = $request->body();
+
+            return str_contains($body, 'name="marginTop"')
+                && str_contains($body, 'name="marginBottom"')
+                && str_contains($body, 'name="marginLeft"')
+                && str_contains($body, 'name="marginRight"')
+                // Room at the foot for the page numbers.
+                && str_contains($body, '24mm');
+        });
+    }
+
     public function test_the_document_carries_everything_the_spec_asks_for()
     {
         Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
