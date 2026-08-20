@@ -14,6 +14,19 @@ return [
     |
     */
 
+    /*
+     * The existing Chromium container that turns the quote template into a PDF
+     * (SPEC §1). Basic auth, because that is what the container in front of it
+     * expects. Absent config is a supported state: the download refuses with an
+     * explanation rather than failing at the request.
+     */
+    'gotenberg' => [
+        'url' => env('GOTENBERG_URL'),
+        'username' => env('GOTENBERG_USERNAME'),
+        'password' => env('GOTENBERG_PASSWORD'),
+        'timeout' => (int) env('GOTENBERG_TIMEOUT', 30),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

@@ -240,6 +240,27 @@ describe('quotes/versions/Show', () => {
         expect(wrapper.text()).not.toContain('cannot be edited');
     });
 
+    /**
+     * A file, not a page, so it has to be a plain link: an Inertia visit would
+     * try to swap the page for a PDF body.
+     */
+    it('offers this version as a download of its own', () => {
+        const link = mount(VersionShow, { props: showProps() })
+            .findAll('a')
+            .find((anchor) => anchor.text() === 'Download PDF');
+
+        expect(link).toBeDefined();
+        expect(link!.attributes('href')).toBe('/quotes/9/versions/21/pdf');
+    });
+
+    it('shows why a download was refused', () => {
+        pageProps.errors = { pdf: 'The PDF service did not respond.' };
+
+        expect(mount(VersionShow, { props: showProps() }).text()).toContain(
+            'The PDF service did not respond.',
+        );
+    });
+
     it('says so when a version has no lines', () => {
         expect(
             mount(VersionShow, { props: showProps({ line_items: [] }) }).text(),

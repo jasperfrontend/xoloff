@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import QuotePdfController from '@/actions/App/Http/Controllers/QuotePdfController';
 import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
@@ -42,6 +44,9 @@ defineOptions({
     },
 });
 
+const page = usePage();
+const pdfError = computed(() => page.props.errors?.pdf);
+
 function describeDiscount(lineItem: VersionLineItem): string | null {
     if (lineItem.discount_type === null || lineItem.discount_value === null) {
         return null;
@@ -80,11 +85,37 @@ function netFor(lineItem: VersionLineItem): string | null {
                 :description="`${quote.customer_name}, saved ${formatDateTime(version.saved_at)}`"
             />
 
-            <Button variant="secondary" as-child>
-                <Link :href="QuoteVersionController.index(props.quote.id).url"
-                    >All versions</Link
-                >
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button variant="secondary" as-child>
+                    <!-- Reprints this version exactly as it went out, texts
+                         and all, rather than whatever the quote says now. A
+                         plain link, because the response is a file. -->
+                    <a
+                        :href="
+                            QuotePdfController.version({
+                                quote: props.quote.id,
+                                version: props.version.id,
+                            }).url
+                        "
+                    >
+                        Download PDF
+                    </a>
+                </Button>
+
+                <Button variant="secondary" as-child>
+                    <Link
+                        :href="QuoteVersionController.index(props.quote.id).url"
+                        >All versions</Link
+                    >
+                </Button>
+            </div>
+        </div>
+
+        <div
+            v-if="pdfError"
+            class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+            {{ pdfError }}
         </div>
 
         <!--

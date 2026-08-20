@@ -5,7 +5,7 @@ import QuoteEdit from '@/pages/quotes/Edit.vue';
 import QuoteForm from '@/pages/quotes/Form.vue';
 import QuoteIndex from '@/pages/quotes/Index.vue';
 import QuoteTotals from '@/pages/quotes/Totals.vue';
-import { resetInertiaStub } from '@/test-support/inertia';
+import { pageProps, resetInertiaStub } from '@/test-support/inertia';
 import type { CalculatedQuote } from '@/types';
 
 vi.mock('@inertiajs/vue3', async () =>
@@ -262,6 +262,52 @@ describe('quotes/Edit', () => {
         });
 
         expect(wrapper.text()).toContain('version 2 of 2');
+    });
+
+    /**
+     * A file, not a page, so it has to be a plain link: an Inertia visit would
+     * try to swap the page for a PDF body.
+     */
+    it('offers the quote as a download', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+
+        const link = wrapper
+            .findAll('a')
+            .find((anchor) => anchor.text() === 'Download PDF');
+
+        expect(link).toBeDefined();
+        expect(link!.attributes('href')).toBe('/quotes/9/pdf');
+    });
+
+    it('offers the history only once there is history to see', () => {
+        const withHistory = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+        const withoutHistory = mount(QuoteEdit, {
+            props: {
+                quote: { ...quote, version_number: 1, version_count: 1 },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        expect(withHistory.text()).toContain('Version history');
+        expect(withoutHistory.text()).not.toContain('Version history');
+        // The download stands on its own: a quote with one version is still
+        // a quote you can send.
+        expect(withoutHistory.text()).toContain('Download PDF');
+    });
+
+    it('shows why a download was refused', () => {
+        pageProps.errors = { pdf: 'The PDF service did not respond.' };
+
+        const wrapper = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+
+        expect(wrapper.text()).toContain('The PDF service did not respond.');
     });
 
     it('warns that saving overwrites while there is only one version', () => {

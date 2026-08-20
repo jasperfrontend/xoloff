@@ -7,6 +7,7 @@ use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
+use App\Http\Controllers\QuotePdfController;
 use App\Http\Controllers\QuotePreviewController;
 use App\Http\Controllers\QuoteVersionController;
 use App\Http\Controllers\TaxClassController;
@@ -40,6 +41,13 @@ Route::middleware(['auth'])->group(function () {
     // saves over the current version (SPEC §3).
     Route::post('quotes/{quote}/versions', [QuoteVersionController::class, 'store'])
         ->name('quotes.versions.store');
+
+    // "Download PDF" (SPEC §6). Two routes rather than one, because a quote
+    // already sent has to be reprintable exactly as it went out.
+    Route::get('quotes/{quote}/pdf', [QuotePdfController::class, 'current'])
+        ->name('quotes.pdf');
+    Route::get('quotes/{quote}/versions/{version}/pdf', [QuotePdfController::class, 'version'])
+        ->name('quotes.versions.pdf');
 
     // The history of a quote: browse it, read a superseded version, remove one
     // (SPEC §6). There is no edit route, because rewriting a past version is

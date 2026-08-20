@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import QuotePdfController from '@/actions/App/Http/Controllers/QuotePdfController';
 import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,11 @@ defineOptions({
         breadcrumbs: [{ title: 'Quotes', href: index() }],
     },
 });
+
+// A refused download redirects back rather than showing a broken file, so the
+// reason has to land somewhere the person can see it.
+const page = usePage();
+const pdfError = computed(() => page.props.errors?.pdf);
 </script>
 
 <template>
@@ -51,11 +58,34 @@ defineOptions({
                 "
             />
 
-            <Button v-if="quote.version_count > 1" variant="secondary" as-child>
-                <Link :href="QuoteVersionController.index(props.quote.id).url">
-                    Version history
-                </Link>
-            </Button>
+            <div class="flex items-center gap-2">
+                <Button variant="secondary" as-child>
+                    <!-- A plain link rather than an Inertia visit: the response
+                         is a file, not a page. -->
+                    <a :href="QuotePdfController.current(props.quote.id).url">
+                        Download PDF
+                    </a>
+                </Button>
+
+                <Button
+                    v-if="quote.version_count > 1"
+                    variant="secondary"
+                    as-child
+                >
+                    <Link
+                        :href="QuoteVersionController.index(props.quote.id).url"
+                    >
+                        Version history
+                    </Link>
+                </Button>
+            </div>
+        </div>
+
+        <div
+            v-if="pdfError"
+            class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+            {{ pdfError }}
         </div>
 
         <QuoteForm
