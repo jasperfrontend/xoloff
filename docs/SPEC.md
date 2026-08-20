@@ -108,6 +108,7 @@ A new row is created only on an explicit "Save as new version" action, never aut
 - `default_validity_days` (default 30)
 - `slack_notifications_enabled`, `helpscout_notifications_enabled` (booleans, toggled in a settings UI)
 - `logo_path`
+- `company_name`, `company_address`, `company_kvk`, `company_vat_number` - Xolution's own identity, printed on the quote PDF. Added in **Milestone 4** (see §7). These live here rather than in the PDF template so they can be corrected without a redeploy.
 - Actual secrets (Slack webhook URL, Help Scout API key/mailbox, SMTP credentials) live in `.env` / GitHub secrets, **not** in this table - see §10.
 
 ---
@@ -172,7 +173,17 @@ The template must include: the intro/footer text snapshots from the current `quo
 
 > **`.nu` is not a typo - do not "correct" it.** The SMTP host really is `smtp.xolution.nu`, while Xolution's email *addresses* live on `.nl` (`stephan@xolution.nl`, Help Scout inbox `contact@xolution.nl`). Both domains are in active use for different purposes. Confirmed by Jasper, 2026-08-12. This isn't a blocker to reaching this milestone - request the exact SMTP credentials/config from Stephan when you actually get here.
 
-**Definition of Done:** sending a quote generates a working magic link, a portal visit is correctly recorded as an "opened" event, and an expired link shows the gentle message rather than a 404.
+**Carried over from Milestone 3.** Both of these surfaced while building the PDF export and neither belonged to M3's Definition of Done, so they were deliberately left rather than quietly absorbed.
+
+- **Xolution's own details are missing from the quote PDF.** The template prints the logo and the customer, but nothing identifying the sender: no address, no KvK number, no BTW number. Those are conventional on Dutch business correspondence and their absence is noticeable on a document a client receives. They belong in `app_settings` (§3), which M4 is already opening for `default_validity_days`.
+
+  **Build the four columns and don't wait on a requirements answer.** Asked what he wants on there, Stephan says "oh just the usual, y'know" (Jasper, 2026-08-20). That is not a specification and will not become one by asking again in a different way. Name, address, KvK and BTW number is the usual, and it is good enough to ship. Show him a rendered PDF afterwards and let him react to something concrete - that is the form of the question he can actually answer - and add a field only if he then names one.
+
+- **The Gotenberg container is publicly reachable and unauthenticated.** Verified 2026-08-20: `xolution-pdf-printer.onrender.com` answers `/health`, `/version` and `/forms/chromium/convert/html` with no credentials, and `/forms/chromium/convert/url` is enabled too, so anyone who knows the hostname can make Xolution's Render instance fetch URLs and render arbitrary HTML at Xolution's expense. This is a Render configuration job, not application code: either move it to a private service, or enable Gotenberg's own basic auth (`--api-enable-basic-auth`, with `GOTENBERG_API_BASIC_AUTH_USERNAME` / `GOTENBERG_API_BASIC_AUTH_PASSWORD` on the container). The application already sends basic auth when `GOTENBERG_USERNAME` / `GOTENBERG_PASSWORD` are set, so nothing changes on this side once it is switched on. **Do this before Milestone 5**, which is the point at which the PDF path becomes customer-facing.
+
+> `RENDER_API_URL` and `RENDER_API_KEY` are Render's **management** API, for listing services and triggering deploys. They are not Gotenberg credentials and are not involved in rendering a PDF. The only configuration the application needs is `GOTENBERG_URL`.
+
+**Definition of Done:** sending a quote generates a working magic link, a portal visit is correctly recorded as an "opened" event, and an expired link shows the gentle message rather than a 404. Xolution's own details appear on the PDF, and the Gotenberg container no longer answers to strangers.
 
 ---
 
@@ -229,5 +240,5 @@ For clarity - these were part of the original brainwave document and were delibe
 
 None of these block starting or building the relevant milestone's logic - they're just credentials to slot in when you get there:
 
-- **Milestone 4:** exact SMTP credentials for `smtp.xolution.nu` (via antispamcloud.com)
+- **Milestone 4:** exact SMTP credentials for `smtp.xolution.nu` (via antispamcloud.com); Xolution's KvK and BTW numbers and postal address (the values themselves, not a decision about which fields - see §7); the Gotenberg basic-auth username and password, once the container has been closed off (see §7)
 - **Milestone 7:** Slack incoming webhook URL; Help Scout mailbox ID and API key
