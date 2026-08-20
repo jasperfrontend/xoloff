@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Concerns\RecordsItsOwnChanges;
+use App\Contracts\DescribesItselfForAudit;
 use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Customer extends Model
+class Customer extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<CustomerFactory> */
-    use HasFactory;
+    use HasFactory, RecordsItsOwnChanges;
 
     protected $fillable = [
         'company_name',
@@ -19,6 +21,11 @@ class Customer extends Model
         'billing_address',
         'country',
     ];
+
+    public function auditLabel(): string
+    {
+        return $this->company_name;
+    }
 
     /**
      * @return HasMany<Quote, $this>

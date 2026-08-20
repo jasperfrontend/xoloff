@@ -5,6 +5,7 @@ import {
     Building2,
     FileText,
     FileType,
+    ScrollText,
     FolderGit2,
     LayoutGrid,
     Package,
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { edit as appSettingsEdit } from '@/routes/app-settings';
+import { index as auditLogIndex } from '@/routes/audit-log';
 import { index as customersIndex } from '@/routes/customers';
 import { edit as premadeTextsEdit } from '@/routes/premade-texts';
 import { index as categoriesIndex } from '@/routes/product-categories';
@@ -70,6 +72,11 @@ const mainNavItems: NavItem[] = [
         title: 'Quote texts',
         href: premadeTextsEdit(),
         icon: FileType,
+    },
+    {
+        title: 'Audit log',
+        href: auditLogIndex(),
+        icon: ScrollText,
     },
     {
         title: 'Settings',

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\RecordsItsOwnChanges;
+use App\Contracts\DescribesItselfForAudit;
 use Database\Factories\QuoteFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,14 +17,27 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read Customer $customer
  * @property-read QuoteVersion|null $currentVersion
  */
-class Quote extends Model
+class Quote extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<QuoteFactory> */
-    use HasFactory;
+    use HasFactory, RecordsItsOwnChanges;
 
     protected $fillable = [
         'customer_id',
     ];
+
+    public function auditLabel(): string
+    {
+        return __('Quote :id', ['id' => $this->getKey()]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function auditContext(): array
+    {
+        return ['label' => $this->auditLabel(), 'quote_id' => $this->getKey()];
+    }
 
     /**
      * @return BelongsTo<Customer, $this>

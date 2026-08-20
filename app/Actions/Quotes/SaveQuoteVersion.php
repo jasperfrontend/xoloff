@@ -2,9 +2,11 @@
 
 namespace App\Actions\Quotes;
 
+use App\Enums\AuditAction;
 use App\Enums\PremadeTextKey;
 use App\Models\PremadeText;
 use App\Models\QuoteVersion;
+use App\Support\Audit\AuditLog;
 
 /**
  * Writes submitted builder content onto a quote version. Shared by saving the
@@ -18,6 +20,9 @@ final class SaveQuoteVersion
      */
     public function handle(QuoteVersion $version, array $data): QuoteVersion
     {
+        $isNew = ! $version->exists;
+        $before = $isNew ? [] : $this->snapshot($version);
+
         $version->fill([
             'discount_type' => $data['discount_type'] ?? null,
             'discount_value' => $data['discount_value'] ?? null,
@@ -54,6 +59,76 @@ final class SaveQuoteVersion
             ]);
         }
 
-        return $version->load('lineItems.taxClass');
+        $version->load('lineItems.taxClass');
+
+        $this->record($version, $isNew, $before);
+
+        return $version;
+    }
+
+    /**
+     * Logged here rather than from the version's own model events, because the
+     * lines are most of what a version is and none of them are written yet when
+     * those events fire. Editing only the lines leaves the version row
+     * untouched, so an event-driven log would miss the edit entirely.
+     *
+     * @param  array<string, mixed>  $before
+     */
+    private function record(QuoteVersion $version, bool $isNew, array $before): void
+    {
+        $after = $this->snapshot($version);
+
+        if ($isNew) {
+            AuditLog::record($version, AuditAction::Created, [
+                ...$version->auditContext(),
+                'attributes' => $after,
+            ]);
+
+            return;
+        }
+
+        $changes = [];
+
+        foreach ($after as $attribute => $value) {
+            if ($value !== ($before[$attribute] ?? null)) {
+                $changes[$attribute] = ['from' => $before[$attribute] ?? null, 'to' => $value];
+            }
+        }
+
+        // Reopening a quote and saving it unchanged is not an event.
+        if ($changes === []) {
+            return;
+        }
+
+        AuditLog::record($version, AuditAction::Updated, [
+            ...$version->auditContext(),
+            'changes' => $changes,
+        ]);
+    }
+
+    /**
+     * A version as a person sees it: the discount, the override, and the lines.
+     *
+     * The text snapshots are left out on purpose. They are copies of the global
+     * texts, whose own edits are already logged, and a whole intro paragraph in
+     * every payload would bury the change someone is actually looking for.
+     *
+     * @return array<string, mixed>
+     */
+    private function snapshot(QuoteVersion $version): array
+    {
+        return [
+            'discount_type' => $version->discount_type?->value,
+            'discount_value' => $version->discount_value,
+            'rounding_override' => $version->rounding_override,
+            'line_items' => $version->lineItems()->orderBy('id')->get()->map(fn ($lineItem): array => [
+                'name' => $lineItem->name,
+                'quantity' => $lineItem->quantity,
+                'unit_price_ex_vat' => $lineItem->unit_price_ex_vat,
+                'tax_class_id' => $lineItem->tax_class_id,
+                'discount_type' => $lineItem->discount_type?->value,
+                'discount_value' => $lineItem->discount_value,
+            ])->all(),
+        ];
     }
 }

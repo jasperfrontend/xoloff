@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AppSettingsController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
@@ -54,6 +55,11 @@ Route::middleware(['auth'])->group(function () {
     // fixed by key, so this is an edit screen rather than a resource.
     Route::get('premade-texts', [PremadeTextController::class, 'edit'])->name('premade-texts.edit');
     Route::put('premade-texts', [PremadeTextController::class, 'update'])->name('premade-texts.update');
+
+    // Everything that has happened, filterable by quote, by date range and by
+    // who caused it (SPEC §3). Read-only: an audit log nobody can edit is the
+    // only kind worth keeping.
+    Route::get('audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
 
     // Application-wide configuration, as opposed to the per-user screens under
     // /settings. One row, so this edits rather than creating (SPEC §3).

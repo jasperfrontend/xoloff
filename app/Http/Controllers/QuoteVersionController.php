@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Quotes\SaveQuoteVersion;
+use App\Enums\AuditAction;
 use App\Http\Requests\QuoteRequest;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
+use App\Support\Audit\AuditLog;
 use App\Support\Quotes\QuoteCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +105,14 @@ class QuoteVersionController extends Controller
             ]);
         }
 
+        $context = $version->auditContext();
+
         $version->delete();
+
+        AuditLog::record($version, AuditAction::Deleted, [
+            ...$context,
+            'attributes' => ['version_number' => $version->version_number],
+        ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Version deleted.')]);
 

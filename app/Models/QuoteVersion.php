@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\Auditable;
+use App\Contracts\DescribesItselfForAudit;
 use App\Enums\DiscountType;
 use Database\Factories\QuoteVersionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,10 +21,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $intro_text_snapshot
  * @property string|null $footer_text_snapshot
  */
-class QuoteVersion extends Model
+class QuoteVersion extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<QuoteVersionFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     protected $fillable = [
         'quote_id',
@@ -48,6 +50,22 @@ class QuoteVersion extends Model
             'discount_value' => 'decimal:2',
             'rounding_override' => 'decimal:2',
         ];
+    }
+
+    public function auditLabel(): string
+    {
+        return __('Quote :quote version :version', [
+            'quote' => $this->quote_id,
+            'version' => $this->version_number,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function auditContext(): array
+    {
+        return ['label' => $this->auditLabel(), 'quote_id' => $this->quote_id];
     }
 
     /**

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\RecordsItsOwnChanges;
+use App\Contracts\DescribesItselfForAudit;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -10,13 +12,20 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string|null $logo_path
  */
-class AppSettings extends Model
+class AppSettings extends Model implements DescribesItselfForAudit
 {
+    use RecordsItsOwnChanges;
+
     protected $table = 'app_settings';
 
     protected $fillable = [
         'logo_path',
     ];
+
+    public function auditLabel(): string
+    {
+        return __('Application settings');
+    }
 
     /**
      * The one row. Created by the migration, so this normally just reads it -

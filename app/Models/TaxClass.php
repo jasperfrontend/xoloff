@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Concerns\RecordsItsOwnChanges;
+use App\Contracts\DescribesItselfForAudit;
 use Database\Factories\TaxClassFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class TaxClass extends Model
+class TaxClass extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<TaxClassFactory> */
-    use HasFactory;
+    use HasFactory, RecordsItsOwnChanges;
 
     protected $fillable = [
         'name',
@@ -28,6 +30,11 @@ class TaxClass extends Model
         return [
             'percentage' => 'decimal:2',
         ];
+    }
+
+    public function auditLabel(): string
+    {
+        return $this->name;
     }
 
     /**

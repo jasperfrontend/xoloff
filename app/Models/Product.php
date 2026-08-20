@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Concerns\Auditable;
+use App\Contracts\DescribesItselfForAudit;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Product extends Model
+class Product extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<ProductFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
 
     protected $fillable = [
         'name',
@@ -31,6 +33,11 @@ class Product extends Model
         return [
             'price_ex_vat' => 'decimal:2',
         ];
+    }
+
+    public function auditLabel(): string
+    {
+        return $this->name;
     }
 
     /**

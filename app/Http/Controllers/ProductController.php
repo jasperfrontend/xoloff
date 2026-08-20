@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AuditAction;
 use App\Http\Requests\ProductRequest;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\TaxClass;
+use App\Support\Audit\AuditLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -36,6 +38,11 @@ class ProductController extends Controller
         DB::transaction(function () use ($data) {
             $product = Product::create($data);
             $this->syncSpecs($product, $data['specs'] ?? []);
+
+            AuditLog::record($product, AuditAction::Created, [
+                ...$product->auditContext(),
+                'attributes' => $this->snapshot($product),
+            ]);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product created.')]);
@@ -56,8 +63,12 @@ class ProductController extends Controller
         $data = $request->validated();
 
         DB::transaction(function () use ($data, $product) {
+            $before = $this->snapshot($product);
+
             $product->update($data);
             $this->syncSpecs($product, $data['specs'] ?? []);
+
+            $this->recordChanges($product, $before);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product updated.')]);
@@ -67,11 +78,61 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        $snapshot = $this->snapshot($product);
+
         $product->delete();
+
+        AuditLog::record($product, AuditAction::Deleted, [
+            ...$product->auditContext(),
+            'attributes' => $snapshot,
+        ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Product deleted.')]);
 
         return to_route('products.index');
+    }
+
+    /**
+     * A product and its specs are one thing to the person editing them, so they
+     * are logged as one entry. Nothing is recorded when a save changed neither.
+     *
+     * @param  array<string, mixed>  $before
+     */
+    private function recordChanges(Product $product, array $before): void
+    {
+        $after = $this->snapshot($product);
+        $changes = [];
+
+        foreach ($after as $attribute => $value) {
+            if ($value !== ($before[$attribute] ?? null)) {
+                $changes[$attribute] = ['from' => $before[$attribute] ?? null, 'to' => $value];
+            }
+        }
+
+        if ($changes === []) {
+            return;
+        }
+
+        AuditLog::record($product, AuditAction::Updated, [
+            ...$product->auditContext(),
+            'changes' => $changes,
+        ]);
+    }
+
+    /**
+     * The product as a person sees it, specs and all.
+     *
+     * @return array<string, mixed>
+     */
+    private function snapshot(Product $product): array
+    {
+        return [
+            ...$product->auditAttributes(),
+            'specs' => $product->specs()
+                ->orderBy('id')
+                ->pluck('value', 'key')
+                ->all(),
+        ];
     }
 
     /**

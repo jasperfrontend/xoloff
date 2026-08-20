@@ -17,6 +17,16 @@ export const submissions: {
     data: Record<string, unknown>;
 }[] = [];
 
+/**
+ * Where router.get lands. Separate from submissions because a filtered
+ * listing is a navigation rather than a form post, and a test asserting on
+ * filters should not have to know that.
+ */
+export const visits: {
+    url: string;
+    data: Record<string, unknown>;
+}[] = [];
+
 export const pageProps: Record<string, unknown> = reactive({
     name: 'Xoloff',
     sidebarOpen: false,
@@ -197,7 +207,9 @@ function usePage() {
 
 const router = {
     visit: vi.fn(),
-    get: vi.fn(),
+    get: vi.fn((url: string, data: Record<string, unknown> = {}) => {
+        visits.push({ url, data });
+    }),
     post: vi.fn(),
     put: vi.fn(),
     patch: vi.fn(),
@@ -254,9 +266,11 @@ export function inertiaStub() {
 
 export function resetInertiaStub() {
     submissions.length = 0;
+    visits.length = 0;
     httpResponse.value = undefined;
     pageProps.errors = {};
     router.visit.mockClear();
+    router.get.mockClear();
     router.post.mockClear();
     router.delete.mockClear();
 }

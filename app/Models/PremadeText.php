@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Concerns\RecordsItsOwnChanges;
+use App\Contracts\DescribesItselfForAudit;
 use App\Enums\PremadeTextKey;
 use Database\Factories\PremadeTextFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,10 +14,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property PremadeTextKey $key
  * @property string $content
  */
-class PremadeText extends Model
+class PremadeText extends Model implements DescribesItselfForAudit
 {
     /** @use HasFactory<PremadeTextFactory> */
-    use HasFactory;
+    use HasFactory, RecordsItsOwnChanges;
 
     protected $fillable = [
         'key',
@@ -30,6 +32,14 @@ class PremadeText extends Model
         return [
             'key' => PremadeTextKey::class,
         ];
+    }
+
+    public function auditLabel(): string
+    {
+        return match ($this->key) {
+            PremadeTextKey::Intro => __('Intro text'),
+            PremadeTextKey::Footer => __('Footer text'),
+        };
     }
 
     /**
