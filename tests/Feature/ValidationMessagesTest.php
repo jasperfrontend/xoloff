@@ -81,6 +81,9 @@ class ValidationMessagesTest extends TestCase
                     ],
                 ],
             ]],
+            'quote texts' => ['put', 'premade-texts.update', [
+                'footer' => '',
+            ]],
             'profile' => ['patch', 'profile.update', [
                 'name' => '',
                 'email' => 'not an email',

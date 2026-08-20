@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
@@ -37,6 +38,11 @@ Route::middleware(['auth'])->group(function () {
     // saves over the current version (SPEC §3).
     Route::post('quotes/{quote}/versions', [QuoteVersionController::class, 'store'])
         ->name('quotes.versions.store');
+
+    // The intro and footer carried by every quote (SPEC §3). Exactly two rows,
+    // fixed by key, so this is an edit screen rather than a resource.
+    Route::get('premade-texts', [PremadeTextController::class, 'edit'])->name('premade-texts.edit');
+    Route::put('premade-texts', [PremadeTextController::class, 'update'])->name('premade-texts.update');
 });
 
 require __DIR__.'/settings.php';

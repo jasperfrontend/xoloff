@@ -100,16 +100,26 @@ const Form = defineComponent({
                     onSubmit: (event: Event) => {
                         event.preventDefault();
 
-                        // Fields are collected by the real Form from the DOM.
-                        // What matters here is the transform, which is how a
-                        // page smuggles values that have no input of their own.
+                        // Collected from the DOM exactly as the real Form
+                        // does, so a field that was never given a name shows
+                        // up here as missing rather than passing silently.
+                        // Hidden inputs count, which is how a page submits a
+                        // value that has no input of its own.
+                        const fields = Object.fromEntries(
+                            new FormData(
+                                event.target as HTMLFormElement,
+                            ).entries(),
+                        );
+
                         submissions.push({
                             method: props.method,
                             url:
                                 typeof props.action === 'string'
                                     ? props.action
                                     : '',
-                            data: props.transform ? props.transform({}) : {},
+                            data: props.transform
+                                ? props.transform(fields)
+                                : fields,
                         });
                     },
                 },

@@ -2,6 +2,8 @@
 
 namespace App\Actions\Quotes;
 
+use App\Enums\PremadeTextKey;
+use App\Models\PremadeText;
 use App\Models\QuoteVersion;
 
 /**
@@ -20,6 +22,15 @@ final class SaveQuoteVersion
             'discount_type' => $data['discount_type'] ?? null,
             'discount_value' => $data['discount_value'] ?? null,
             'rounding_override' => $data['rounding_override'] ?? null,
+
+            // Copied at save time rather than referenced live (SPEC §3).
+            // Taken on every save, including saving over the current version,
+            // because "save time" is what the snapshot is a snapshot of. What
+            // this protects is the versions behind it: once superseded, a
+            // version is never written to again, so the wording a customer saw
+            // or signed survives any later edit to the global texts.
+            'intro_text_snapshot' => PremadeText::contentFor(PremadeTextKey::Intro),
+            'footer_text_snapshot' => PremadeText::contentFor(PremadeTextKey::Footer),
         ])->save();
 
         // Lines are replaced wholesale rather than diffed, matching how product

@@ -4,6 +4,7 @@ import {
     BookOpen,
     Building2,
     FileText,
+    FileType,
     FolderGit2,
     LayoutGrid,
     Package,
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as customersIndex } from '@/routes/customers';
+import { edit as premadeTextsEdit } from '@/routes/premade-texts';
 import { index as categoriesIndex } from '@/routes/product-categories';
 import { index as productsIndex } from '@/routes/products';
 import { index as quotesIndex } from '@/routes/quotes';
@@ -61,6 +63,11 @@ const mainNavItems: NavItem[] = [
         title: 'Tax classes',
         href: taxClassesIndex(),
         icon: Percent,
+    },
+    {
+        title: 'Quote texts',
+        href: premadeTextsEdit(),
+        icon: FileType,
     },
 ];
 
