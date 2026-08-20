@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AppSettingsController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
@@ -43,6 +44,13 @@ Route::middleware(['auth'])->group(function () {
     // fixed by key, so this is an edit screen rather than a resource.
     Route::get('premade-texts', [PremadeTextController::class, 'edit'])->name('premade-texts.edit');
     Route::put('premade-texts', [PremadeTextController::class, 'update'])->name('premade-texts.update');
+
+    // Application-wide configuration, as opposed to the per-user screens under
+    // /settings. One row, so this edits rather than creating (SPEC §3).
+    Route::get('app-settings', [AppSettingsController::class, 'edit'])->name('app-settings.edit');
+    Route::post('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
+    Route::delete('app-settings/logo', [AppSettingsController::class, 'destroyLogo'])
+        ->name('app-settings.logo.destroy');
 });
 
 require __DIR__.'/settings.php';

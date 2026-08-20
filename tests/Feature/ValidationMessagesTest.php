@@ -84,6 +84,7 @@ class ValidationMessagesTest extends TestCase
             'quote texts' => ['put', 'premade-texts.update', [
                 'footer' => '',
             ]],
+            'app settings' => ['post', 'app-settings.update', []],
             'profile' => ['patch', 'profile.update', [
                 'name' => '',
                 'email' => 'not an email',

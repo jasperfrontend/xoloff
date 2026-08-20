@@ -9,6 +9,7 @@ import {
     LayoutGrid,
     Package,
     Percent,
+    Settings,
     Tags,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -25,6 +26,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { edit as appSettingsEdit } from '@/routes/app-settings';
 import { index as customersIndex } from '@/routes/customers';
 import { edit as premadeTextsEdit } from '@/routes/premade-texts';
 import { index as categoriesIndex } from '@/routes/product-categories';
@@ -68,6 +70,11 @@ const mainNavItems: NavItem[] = [
         title: 'Quote texts',
         href: premadeTextsEdit(),
         icon: FileType,
+    },
+    {
+        title: 'Settings',
+        href: appSettingsEdit(),
+        icon: Settings,
     },
 ];
 
