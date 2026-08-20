@@ -164,6 +164,33 @@ class AppSettingsTest extends TestCase
             ->assertSessionHasErrors('logo');
     }
 
+    /**
+     * PHP can fail an upload before any rule of ours runs: the file is too big
+     * for its limits, or it has nowhere writable to put the temporary file.
+     * Laravel's default wording for that is "The logo failed to upload", which
+     * names neither cause and sends whoever hit it looking in the wrong place.
+     */
+    public function test_an_upload_php_itself_refused_says_what_might_be_wrong()
+    {
+        $file = UploadedFile::fake()->image('xolution.png');
+
+        $refused = new UploadedFile(
+            $file->getPathname(),
+            'xolution.png',
+            'image/png',
+            UPLOAD_ERR_CANT_WRITE,
+            test: true,
+        );
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('app-settings.update'), ['logo' => $refused])
+            ->assertSessionHasErrors([
+                'logo' => 'The logo could not be uploaded. Either it is larger than the server accepts, or the server had nowhere to store it while it arrived.',
+            ]);
+
+        $this->assertNull(AppSettings::current()->logo_path);
+    }
+
     public function test_a_guest_cannot_reach_any_of_it()
     {
         $this->get(route('app-settings.edit'))->assertRedirect(route('login'));

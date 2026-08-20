@@ -44,6 +44,14 @@ class AppSettingsRequest extends FormRequest
     {
         return [
             'logo.required' => __('Choose an image file to use as the logo.'),
+
+            // Laravel's default here is "The logo failed to upload", which is
+            // true and useless: it covers a file that was too big for PHP and a
+            // server that could not write its temporary file, and points at
+            // neither. On Windows the second one happens whenever the dev
+            // server is launched from a shell with no TMP, because PHP then
+            // falls back to C:\WINDOWS and cannot write there.
+            'logo.uploaded' => __('The logo could not be uploaded. Either it is larger than the server accepts, or the server had nowhere to store it while it arrived.'),
             'logo.mimes' => __('Upload the logo as a PNG, JPG or WebP file.'),
             'logo.max' => __('Keep the logo under 2 MB.'),
         ];
