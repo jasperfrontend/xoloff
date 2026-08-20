@@ -24,7 +24,10 @@
             --ink: #14181f;
             --muted: #5b6472;
             --line: #e3e7ee;
-            --accent: #0f6f7a;
+            /* Xolution's green, sampled from the uploaded logo rather than
+               guessed at, so the rule under the header and the links below
+               agree with the mark above them. */
+            --accent: #2e9238;
             --tint: #f5f8f9;
         }
 
