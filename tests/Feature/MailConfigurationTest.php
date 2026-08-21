@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Tests\Concerns\HidesTheRealEnvironment;
 use Tests\TestCase;
 
 /**
@@ -12,19 +13,14 @@ use Tests\TestCase;
  * as null, the mailer quietly falls back to a local address on port 2525, and
  * the first anyone knows is a quote that never arrived.
  *
- * Every one of these keys is blanked before each case and restored after, so
- * nothing here ever reads the real environment. That is not tidiness: an
- * assertion that fails prints the value it found, and the real value of one of
- * these is a password. It has to be impossible for a broken test to put it on
- * screen.
- *
- * Blanking means all three of $_ENV, $_SERVER and putenv. Laravel's env()
- * reads them in that order and stops at the first hit, so clearing only the
- * last of them leaves the real value in play - which is exactly the mistake
- * this comment exists to stop the next person repeating.
+ * Every one of these keys is hidden for the duration - one of them is a live
+ * SMTP password, and a failing assertion prints what it found. See
+ * HidesTheRealEnvironment.
  */
 class MailConfigurationTest extends TestCase
 {
+    use HidesTheRealEnvironment;
+
     /**
      * @var list<string>
      */
@@ -41,49 +37,22 @@ class MailConfigurationTest extends TestCase
         'MAIL_FROM_ADDRESS',
     ];
 
-    /**
-     * @var array<string, array{env: mixed, server: mixed, putenv: string|false}>
-     */
-    private array $originals = [];
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        foreach (self::KEYS as $key) {
-            $this->originals[$key] = [
-                'env' => $_ENV[$key] ?? null,
-                'server' => $_SERVER[$key] ?? null,
-                'putenv' => getenv($key),
-            ];
-
-            $this->forget($key);
-        }
+        $this->hideEnvironmentKeys(self::KEYS);
     }
 
     protected function tearDown(): void
     {
-        foreach ($this->originals as $key => $original) {
-            $this->forget($key);
-
-            if ($original['env'] !== null) {
-                $_ENV[$key] = $original['env'];
-            }
-
-            if ($original['server'] !== null) {
-                $_SERVER[$key] = $original['server'];
-            }
-
-            if ($original['putenv'] !== false) {
-                putenv("{$key}={$original['putenv']}");
-            }
-        }
+        $this->restoreTheRealEnvironment();
 
         parent::tearDown();
     }
 
     /**
-     * The guard on everything below, and the reason the blanking above exists.
+     * The guard on everything below, and the reason the hiding exists.
      *
      * Deliberately assertTrue with a message rather than assertNull: a failing
      * assertNull prints the value it found, and the value it would find here
@@ -96,11 +65,11 @@ class MailConfigurationTest extends TestCase
 
         $this->assertTrue(
             $config['mailers']['smtp']['password'] === null,
-            'A real credential was visible to this test. Blanking is not working.',
+            'A real credential was visible to this test. Hiding is not working.',
         );
         $this->assertTrue(
             $config['mailers']['smtp']['host'] === '127.0.0.1',
-            'The real relay host was visible to this test. Blanking is not working.',
+            'The real relay host was visible to this test. Hiding is not working.',
         );
     }
 
@@ -190,25 +159,14 @@ class MailConfigurationTest extends TestCase
 
     private function set(string $key, string $value): void
     {
-        $_ENV[$key] = $value;
-        $_SERVER[$key] = $value;
-        putenv("{$key}={$value}");
-    }
-
-    private function forget(string $key): void
-    {
-        unset($_ENV[$key], $_SERVER[$key]);
-        putenv($key);
+        $this->setEnvironmentKey($key, $value);
     }
 
     /**
-     * Re-evaluated rather than read from the container: the container's copy
-     * was built once, from the real environment, before any of this ran.
-     *
      * @return array<string, mixed>
      */
     private function mailConfig(): array
     {
-        return require base_path('config/mail.php');
+        return $this->freshConfig('mail');
     }
 }

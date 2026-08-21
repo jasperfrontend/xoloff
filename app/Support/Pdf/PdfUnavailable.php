@@ -28,6 +28,14 @@ class PdfUnavailable extends RuntimeException
 
     public static function refused(int $status): self
     {
+        // 401 and 403 have one cause worth naming. The container is behind
+        // basic auth, and the credentials here drifting from the ones it was
+        // started with is the way this breaks - a generic "refused (401)"
+        // sends whoever hit it looking at the template instead.
+        if (in_array($status, [401, 403], true)) {
+            return new self(__('The PDF service refused our credentials. GOTENBERG_API_BASIC_AUTH_USERNAME and GOTENBERG_API_BASIC_AUTH_PASSWORD no longer match what the container was started with.'));
+        }
+
         return new self(__('The PDF service refused the request (:status).', ['status' => $status]));
     }
 }

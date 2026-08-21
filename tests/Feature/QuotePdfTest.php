@@ -431,6 +431,53 @@ class QuotePdfTest extends TestCase
             ->assertSessionHasErrors(['pdf' => 'The PDF service did not respond. It may be starting up, so try again in a moment.']);
     }
 
+    /**
+     * The container is behind basic auth (SPEC §7). Sending the credentials is
+     * the whole of what this side has to do about that.
+     */
+    public function test_it_authenticates_to_the_container()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
+
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader(
+            'Authorization',
+            'Basic '.base64_encode('xolution:secret'),
+        ));
+    }
+
+    /**
+     * A 401 has one cause worth naming: the credentials here have drifted from
+     * the ones the container was started with. "Refused (401)" would send
+     * whoever hit it looking at the template instead.
+     */
+    public function test_refused_credentials_say_which_two_settings_to_look_at()
+    {
+        Http::fake(['pdf.test/*' => Http::response('unauthorized', 401)]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->from(route('quotes.edit', $quote))
+            ->get(route('quotes.pdf', $quote))
+            ->assertSessionHasErrors([
+                'pdf' => 'The PDF service refused our credentials. GOTENBERG_API_BASIC_AUTH_USERNAME and GOTENBERG_API_BASIC_AUTH_PASSWORD no longer match what the container was started with.',
+            ]);
+    }
+
+    public function test_any_other_refusal_still_reports_its_status()
+    {
+        Http::fake(['pdf.test/*' => Http::response('boom', 503)]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->from(route('quotes.edit', $quote))
+            ->get(route('quotes.pdf', $quote))
+            ->assertSessionHasErrors(['pdf' => 'The PDF service refused the request (503).']);
+    }
+
     public function test_a_missing_configuration_explains_itself_rather_than_failing()
     {
         config()->set('services.gotenberg.url', null);
