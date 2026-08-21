@@ -6,7 +6,17 @@ import { cn } from "@/lib/utils"
 
 import 'vue-sonner/style.css';
 
-const props = defineProps<ToasterProps>()
+/**
+ * richColors on by default.
+ *
+ * Without it every toast is popover-on-popover: white on white in the light
+ * theme, in the bottom corner, where a failure looks exactly like a success
+ * and both are easy to miss entirely. The icons already differ per status;
+ * this makes the colour differ too.
+ */
+const props = withDefaults(defineProps<ToasterProps>(), {
+    richColors: true,
+})
 </script>
 
 <template>
