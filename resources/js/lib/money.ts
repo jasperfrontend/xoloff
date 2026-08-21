@@ -33,10 +33,28 @@ export function formatMoney(value: string | number): string {
 }
 
 /**
- * 21 becomes "21,00%".
+ * 21 becomes "21,00%". For discounts, and for the rate as a customer reads it
+ * on a quote - "Btw 21,0000% over EUR 760,00" reads like a machine printed it.
  */
 export function formatPercentage(value: string | number): string {
     return `${formatAmount(value)}%`;
+}
+
+const rateFormatter = new Intl.NumberFormat('nl-NL', {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+});
+
+/**
+ * 21 becomes "21,0000%".
+ *
+ * Tax rates are stored and calculated at four decimals, so the screens where
+ * one is administered or chosen show all four. Hiding two of them would mean
+ * two rates that differ reading identically, which is the mistake this
+ * precision exists to make impossible.
+ */
+export function formatTaxRate(value: string | number): string {
+    return `${rateFormatter.format(toNumber(value))}%`;
 }
 
 /**

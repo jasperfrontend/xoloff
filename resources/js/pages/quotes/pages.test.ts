@@ -225,7 +225,7 @@ describe('quotes/Totals', () => {
             props: { totals: totals(), calculating: false },
         });
 
-        expect(wrapper.text()).toContain('VAT 21,00%');
+        expect(wrapper.text()).toContain('VAT 21,0000%');
         expect(wrapper.text()).toContain(`€${NBSP}37,80`);
         expect(wrapper.text()).toContain(`€${NBSP}217,80`);
     });
@@ -310,6 +310,7 @@ describe('quotes/Edit', () => {
         customer_email: 'anna@acme.test',
         status: 'draft' as const,
         status_label: 'Draft',
+        is_editable: true,
         deny_reason: null,
         sent_at: null,
         valid_until: null,

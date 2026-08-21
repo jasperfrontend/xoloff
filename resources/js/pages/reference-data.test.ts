@@ -86,7 +86,9 @@ describe('tax-classes', () => {
         });
 
         expect(wrapper.text()).toContain('Standard 21%');
-        expect(wrapper.text()).toContain('21,00%');
+        // Four decimals, because that is what the column stores and a rate
+        // shown rounded is a rate somebody will type back in wrong.
+        expect(wrapper.text()).toContain('21,0000%');
     });
 
     it('says so when there are none', () => {

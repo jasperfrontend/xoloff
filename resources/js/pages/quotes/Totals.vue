@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatMoney, formatPercentage } from '@/lib/money';
+import { formatMoney, formatTaxRate } from '@/lib/money';
 import type { CalculatedQuote } from '@/types';
 
 withDefaults(
@@ -72,7 +72,7 @@ withDefaults(
                 class="flex justify-between"
             >
                 <dt class="text-foreground">
-                    VAT {{ formatPercentage(taxClassTotal.percentage) }}
+                    VAT {{ formatTaxRate(taxClassTotal.percentage) }}
                     <span class="text-muted-foreground">
                         over {{ formatMoney(taxClassTotal.net) }}
                     </span>

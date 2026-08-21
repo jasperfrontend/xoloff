@@ -23,12 +23,16 @@ class TaxClass extends Model implements DescribesItselfForAudit
      * Cast as a fixed-precision string, never a float - this value feeds the
      * M2 calculation engine.
      *
+     * Four decimals, matching the column. At two the cast would round on the
+     * way out and the extra precision in the database would never reach the
+     * engine, which is a silent way to lose it.
+     *
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
-            'percentage' => 'decimal:2',
+            'percentage' => 'decimal:4',
         ];
     }
 

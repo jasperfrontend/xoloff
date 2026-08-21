@@ -87,10 +87,11 @@ class QuoteCalculatorTest extends TestCase
 
         $this->assertCount(2, $result->taxClassTotals);
 
-        // Ordered by rate descending.
-        $this->assertSame('21.00', $result->taxClassTotals[0]->percentage);
+        // Ordered by rate descending. The rate carries four decimals, as the
+        // column stores it; the money it works out to carries two.
+        $this->assertSame('21.0000', $result->taxClassTotals[0]->percentage);
         $this->assertSame('21.00', $result->taxClassTotals[0]->vat);
-        $this->assertSame('9.00', $result->taxClassTotals[1]->percentage);
+        $this->assertSame('9.0000', $result->taxClassTotals[1]->percentage);
         $this->assertSame('9.00', $result->taxClassTotals[1]->vat);
 
         $this->assertSame('30.00', $result->vatTotal);

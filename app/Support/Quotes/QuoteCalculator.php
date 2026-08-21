@@ -23,10 +23,21 @@ use App\Models\QuoteVersion;
 final class QuoteCalculator
 {
     /**
-     * Percentages are held as hundredths of a percent, so a rate is applied by
-     * multiplying and then dividing by this.
+     * Discount percentages are held as hundredths of a percent, so one is
+     * applied by multiplying and then dividing by this.
      */
     private const PERCENT_SCALE = 10000;
+
+    /**
+     * Tax rates carry four decimals rather than two, so they get a scale of
+     * their own: ten-thousandths of a percent.
+     *
+     * Kept separate from PERCENT_SCALE on purpose. The two were one constant
+     * until a rate needed the extra precision, and widening the shared one
+     * would have changed how every discount is calculated as a side effect of
+     * a VAT change.
+     */
+    private const RATE_SCALE = 1000000;
 
     public function calculate(QuoteVersion $version): CalculatedQuote
     {
@@ -242,14 +253,14 @@ final class QuoteCalculator
 
         foreach ($totals as $id => $total) {
             $totals[$id]['vat'] = $this->divideRounded(
-                $total['net'] * $this->toCents($total['percentage']),
-                self::PERCENT_SCALE,
+                $total['net'] * $this->toRate($total['percentage']),
+                self::RATE_SCALE,
             );
         }
 
         $ordered = array_values($totals);
 
-        usort($ordered, fn (array $a, array $b): int => $this->toCents($b['percentage']) <=> $this->toCents($a['percentage']));
+        usort($ordered, fn (array $a, array $b): int => $this->toRate($b['percentage']) <=> $this->toRate($a['percentage']));
 
         return $ordered;
     }
@@ -289,6 +300,25 @@ final class QuoteCalculator
         $cents = (int) $whole * 100 + (int) $fraction;
 
         return $negative ? -$cents : $cents;
+    }
+
+    /**
+     * Parses a tax rate into ten-thousandths of a percent, without ever
+     * touching a float.
+     *
+     * Four fraction digits rather than the two toCents keeps. A rate stored as
+     * 21.1234 would otherwise be read as 21.12 and the rest silently dropped
+     * from the VAT - which is the exact rounding this precision exists to
+     * avoid.
+     */
+    private function toRate(string $value): int
+    {
+        [$whole, $fraction] = array_pad(explode('.', trim($value), 2), 2, '0');
+
+        $whole = ltrim($whole, '+');
+        $fraction = substr(str_pad($fraction, 4, '0'), 0, 4);
+
+        return (int) $whole * 10000 + (int) $fraction;
     }
 
     private function toMoney(int $cents): string

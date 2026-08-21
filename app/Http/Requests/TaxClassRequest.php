@@ -19,8 +19,11 @@ class TaxClassRequest extends FormRequest
                 'max:255',
                 Rule::unique('tax_classes', 'name')->ignore($this->route('tax_class')),
             ],
-            // 0.00 is a legitimate rate - zero-rated / reverse charge (SPEC §3).
-            'percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+            // 0 is a legitimate rate - zero-rated / reverse charge (SPEC §3).
+            // Four decimals, matching the column and the engine: anything
+            // finer would be rounded on the way into the database, which is
+            // the rounding this precision exists to prevent.
+            'percentage' => ['required', 'numeric', 'min:0', 'max:100', 'decimal:0,4'],
         ];
     }
 }

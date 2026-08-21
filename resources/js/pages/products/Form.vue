@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { formatPercentage, normalizeAmount } from '@/lib/money';
+import { formatTaxRate, normalizeAmount } from '@/lib/money';
 import { index } from '@/routes/products';
 
 interface Spec {
@@ -121,7 +121,7 @@ function removeSpec(indexToRemove: number) {
                         :value="taxClass.id.toString()"
                     >
                         {{ taxClass.name }} ({{
-                            formatPercentage(taxClass.percentage)
+                            formatTaxRate(taxClass.percentage)
                         }})
                     </SelectItem>
                 </SelectContent>

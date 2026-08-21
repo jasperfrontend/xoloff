@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import TaxClassController from '@/actions/App/Http/Controllers/TaxClassController';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import ResourceHeader from '@/components/ResourceHeader.vue';
-import { formatPercentage } from '@/lib/money';
+import { formatTaxRate } from '@/lib/money';
 import { index } from '@/routes/tax-classes';
 
 interface TaxClass {
@@ -77,7 +77,7 @@ const deleteError = computed(() => page.props.errors?.taxClass);
                             </Link>
                         </td>
                         <td class="px-4 py-3 tabular-nums">
-                            {{ formatPercentage(taxClass.percentage) }}
+                            {{ formatTaxRate(taxClass.percentage) }}
                         </td>
                         <td class="px-4 py-3 text-foreground">
                             {{ taxClass.products_count }}
