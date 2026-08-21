@@ -1,0 +1,30 @@
+# The build stages install their own dependencies and compile their own
+# assets, so anything already built locally is at best wasted upload and at
+# worst a stale artefact shadowing a fresh one.
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+
+# Never. The container's configuration comes from Kamal's env, and a local
+# .env carries live credentials.
+.env
+.env.*
+!.env.example
+
+/.git
+/.github
+/.idea
+/.vscode
+/.kamal
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/tests
+/docs
+phpunit.xml
+phpstan.neon
+.phpunit.result.cache
+*.md

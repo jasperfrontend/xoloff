@@ -1,0 +1,126 @@
+# Kamal 2. One web role and one Postgres accessory, which is genuinely all
+# xoloff needs: session, cache and queue are all `database`, there are no jobs
+# and the scheduler registers nothing, so there is no Redis and no second role.
+
+service: xoloff
+
+# No registry prefix here on purpose. Kamal prepends registry.server, so
+# writing ghcr.io/... would resolve to ghcr.io/ghcr.io/... - which fails
+# silently at the cache layer and loudly at the push.
+image: jasperfrontend/xoloff
+
+servers:
+  web:
+    - 172.235.171.118
+
+proxy:
+  ssl: true
+  host: freyr.xolution.nl
+  app_port: 80
+  healthcheck:
+    path: /up
+
+registry:
+  server: ghcr.io
+  username: jasperfrontend
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  # Built on the runner. A 1GB Nanode would not enjoy compiling PHP extensions
+  # and running Vite.
+  remote: false
+  cache:
+    type: registry
+    # Same rule as `image` above: no ghcr.io/ prefix. Registry cache rather
+    # than type: gha, because Kamal uses its own buildx builder which cannot
+    # reach the GitHub Actions cache service, and the flag fails quietly so
+    # every deploy would silently rebuild from scratch.
+    image: jasperfrontend/xoloff-buildcache
+    options: mode=max
+  args:
+    # Vite reads VITE_* at build time inside the image, so a runtime variable
+    # never reaches it.
+    VITE_APP_NAME: Xoloff
+
+ssh:
+  user: deploy
+
+env:
+  clear:
+    APP_NAME: Xoloff
+    APP_ENV: production
+    APP_DEBUG: false
+    APP_URL: https://freyr.xolution.nl
+
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: info
+
+    DB_CONNECTION: pgsql
+    # The accessory's container name on the Docker network.
+    DB_HOST: xoloff-postgres
+    DB_PORT: 5432
+    DB_DATABASE: xoloff
+    DB_USERNAME: xoloff
+
+    SESSION_DRIVER: database
+    CACHE_STORE: database
+    QUEUE_CONNECTION: database
+
+    # Deliberately the log mailer for now. Linode blocks outbound SMTP on new
+    # instances (verified 2026-08-21: every SMTP port refused to every
+    # destination while ordinary HTTPS worked), and a support ticket is open.
+    # Sending a quote still works and fails honestly - the link is issued and
+    # shown on screen with a message saying the email did not go out.
+    MAIL_MAILER: log
+
+    # Boot steps in docker/entrypoint.sh. Behind flags so a second role added
+    # later does not race this one to migrate.
+    RUN_MIGRATIONS: true
+    RUN_OPTIMIZE: true
+
+  secret:
+    - APP_KEY
+    - DB_PASSWORD
+    - GOTENBERG_URL
+    - GOTENBERG_API_BASIC_AUTH_USERNAME
+    - GOTENBERG_API_BASIC_AUTH_PASSWORD
+    # Read only by the seeder, which is run by hand rather than on deploy:
+    # UserSeeder overwrites the password every time it runs, so seeding
+    # automatically would reset a password someone had changed.
+    - SEED_JASPER_PASSWORD
+    - SEED_STEPHAN_PASSWORD
+
+accessories:
+  postgres:
+    # An accessory image is an opaque reference and gets no registry prefix
+    # prepended, unlike `image` at the top of this file. This one is public, so
+    # it needs no prefix at all.
+    image: postgres:17
+    host: 172.235.171.118
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_DB: xoloff
+        POSTGRES_USER: xoloff
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - data:/var/lib/postgresql/data
+    # No `restart:` here. Kamal sets its own policy and rejects the option
+    # with "Cannot set restart policy in docker options".
+    cmd: >-
+      postgres
+      -c shared_buffers=128MB
+      -c max_connections=50
+    options:
+      cpus: 1
+
+aliases:
+  console: app exec --interactive --reuse "php artisan tinker"
+  shell: app exec --interactive --reuse "bash"
+  logs: app logs --follow
+  migrate: app exec --reuse "php artisan migrate --force"
+  # Once, after the first deploy. Idempotent, but see the note above.
+  seed: app exec --reuse "php artisan db:seed --force"

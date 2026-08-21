@@ -56,3 +56,79 @@ jobs:
 
       - name: Run CI Checks
         run: composer ci:check
+
+  # Gated in the workflow with `needs:` rather than by branch protection alone.
+  # Protection only covers pull requests, so a direct push to main would
+  # otherwise deploy in parallel with the tests rather than behind them. Keep
+  # branch protection as well; this makes both routes in behave the same.
+  deploy:
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    permissions:
+      contents: read
+      packages: write
+
+    # Never cancel a half-finished deploy: Kamal would leave the proxy pointing
+    # at a container that is on its way out.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: '3.3'
+
+      - name: Install Kamal
+        run: gem install kamal --no-document
+
+      - name: Deploy
+        env:
+          KAMAL_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          KAMAL_SSH_PRIVATE_KEY: ${{ secrets.KAMAL_SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          GOTENBERG_URL: ${{ secrets.GOTENBERG_URL }}
+          GOTENBERG_API_BASIC_AUTH_USERNAME: ${{ secrets.GOTENBERG_API_BASIC_AUTH_USERNAME }}
+          GOTENBERG_API_BASIC_AUTH_PASSWORD: ${{ secrets.GOTENBERG_API_BASIC_AUTH_PASSWORD }}
+          SEED_JASPER_PASSWORD: ${{ secrets.SEED_JASPER_PASSWORD }}
+          SEED_STEPHAN_PASSWORD: ${{ secrets.SEED_STEPHAN_PASSWORD }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KAMAL_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # Without -H, deliberately. A hashed known_hosts entry makes Kamal's
+          # Ruby Net::SSH throw HostKeyMismatch while plain ssh connects fine,
+          # which reads as a credentials problem and is not one.
+          ssh-keyscan -t rsa,ecdsa,ed25519 "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          # Regenerated every run; GitHub secrets are the source of truth and
+          # this file is never committed. printf %q shell-quotes the values so
+          # one containing a space or a quote cannot corrupt the file.
+          #
+          # Adding a secret is always three edits: the env: block above, this
+          # list, and env.secret in config/deploy.yml. Miss one and it fails at
+          # deploy time with an unhelpful message.
+          mkdir -p .kamal
+          {
+            for v in KAMAL_REGISTRY_PASSWORD APP_KEY DB_PASSWORD POSTGRES_PASSWORD \
+                     GOTENBERG_URL GOTENBERG_API_BASIC_AUTH_USERNAME \
+                     GOTENBERG_API_BASIC_AUTH_PASSWORD \
+                     SEED_JASPER_PASSWORD SEED_STEPHAN_PASSWORD; do
+              printf '%s=%q\n' "$v" "${!v}"
+            done
+          } > .kamal/secrets
+
+          kamal deploy
