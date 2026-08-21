@@ -182,7 +182,7 @@ const companyAddress = ref(props.settings.company_address ?? '');
                     v-if="settings.logo_preview_url"
                     :src="settings.logo_preview_url"
                     alt="The logo printed on quotes"
-                    class="max-h-24 max-w-full object-contain"
+                    class="h-24 w-auto max-w-full object-contain"
                 />
                 <p
                     v-else

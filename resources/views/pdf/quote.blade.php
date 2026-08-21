@@ -73,9 +73,20 @@
             padding-bottom: 10pt;
         }
 
+        /* A definite height with the width left to follow, rather than two
+           max- constraints and nothing definite at all.
+
+           An SVG logo can declare width="100%" height="100%", which are
+           percentages of a containing block that does not exist inside an img,
+           so it has no intrinsic size and collapses to nothing under max- rules
+           alone. It does carry an aspect ratio from its viewBox, and a definite
+           height is all that is needed to use it. Raster logos are unaffected:
+           they scale to the same height they did before. */
         .logo {
-            max-height: 60pt;
+            height: 60pt;
+            width: auto;
             max-width: 180pt;
+            object-fit: contain;
         }
 
         .reference {
