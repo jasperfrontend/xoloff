@@ -11,8 +11,8 @@ vi.mock('@inertiajs/vue3', async () =>
 type Settings = InstanceType<typeof AppSettingsEdit>['$props']['settings'];
 
 const blank: Settings = {
-    logo_path: null,
     logo_url: null,
+    logo_preview_url: null,
     company_name: null,
     company_address: null,
     company_kvk: null,
@@ -26,9 +26,9 @@ function build(settings: Partial<Settings> = {}) {
     });
 }
 
-const uploaded = {
-    logo_path: 'logos/xolution.png',
-    logo_url: '/storage/logos/xolution.png',
+const saved = {
+    logo_url: 'https://xolution.nl/wp-content/uploads/logo.svg',
+    logo_preview_url: '/logo',
 };
 
 const details = {
@@ -43,29 +43,37 @@ describe('app-settings/Edit', () => {
         resetInertiaStub();
     });
 
-    it('says so when no logo has been uploaded', () => {
+    it('says so when no logo has been saved', () => {
         const wrapper = build();
 
-        expect(wrapper.text()).toContain('No logo uploaded yet');
+        expect(wrapper.text()).toContain('No logo saved yet');
         expect(wrapper.find('img').exists()).toBe(false);
     });
 
-    it('shows the logo that is in use', () => {
-        const wrapper = build(uploaded);
+    /**
+     * The stored copy, not the address it came from. Previewing the remote
+     * image would show what is out there rather than what this application
+     * actually holds, which is the one thing this screen is for.
+     */
+    it('previews the stored copy rather than the remote address', () => {
+        const wrapper = build(saved);
 
-        expect(wrapper.find('img').attributes('src')).toBe(
-            '/storage/logos/xolution.png',
-        );
-        expect(wrapper.text()).not.toContain('No logo uploaded yet');
+        expect(wrapper.find('img').attributes('src')).toBe('/logo');
+        expect(wrapper.text()).not.toContain('No logo saved yet');
     });
 
-    /**
-     * Uploading over an existing logo replaces it, so the button should not
-     * promise to add a second one.
-     */
-    it('offers to replace rather than upload once there is a logo', () => {
-        expect(build().text()).toContain('Upload logo');
-        expect(build(uploaded).text()).toContain('Replace logo');
+    it('keeps the address in the field so a typo can be corrected', () => {
+        const input = build(saved).find('input[name="logo_url"]');
+
+        expect((input.element as HTMLInputElement).value).toBe(
+            'https://xolution.nl/wp-content/uploads/logo.svg',
+        );
+        expect(input.attributes('type')).toBe('url');
+    });
+
+    it('offers to fetch again rather than to save once there is a logo', () => {
+        expect(build().text()).toContain('Save logo');
+        expect(build(saved).text()).toContain('Fetch again');
     });
 
     it('offers removal only when there is something to remove', () => {
@@ -73,27 +81,14 @@ describe('app-settings/Edit', () => {
             false,
         );
         expect(
-            build(uploaded).find('button[aria-label="Remove logo"]').exists(),
+            build(saved).find('button[aria-label="Remove logo"]').exists(),
         ).toBe(true);
-    });
-
-    /**
-     * The server refuses anything else, and an accept list that disagreed with
-     * it would let the file picker offer files that are then rejected.
-     */
-    it('offers the file picker only the formats the server takes', () => {
-        const input = build().find('input[type="file"]');
-
-        expect(input.attributes('name')).toBe('logo');
-        expect(input.attributes('accept')).toBe(
-            'image/png,image/jpeg,image/webp',
-        );
     });
 
     // The wording lives in the confirmation dialog, which only renders once
     // the dialog is opened, so it is read off the prop that carries it.
     it('promises that a downloaded quote keeps the logo it was printed with', () => {
-        const description = build(uploaded)
+        const description = build(saved)
             .findComponent(ConfirmDeleteButton)
             .props('description');
 
@@ -171,22 +166,18 @@ describe('app-settings/Edit', () => {
         });
 
         /**
-         * The logo saves on its own. Sharing a form would mean a validation
-         * error on any field silently dropped the chosen file, which a file
-         * input cannot be repopulated with.
+         * The logo saves on its own. Sharing a form would hold a KvK number
+         * hostage to someone else's web server being up at that moment.
          */
         it('saves separately from the logo', () => {
-            const wrapper = build();
-            const forms = wrapper.findAll('form');
+            const logoForm = build()
+                .findAll('form')
+                .find((form) => form.find('input[name="logo_url"]').exists());
 
-            expect(forms[0].find('input[type="file"]').exists()).toBe(false);
-            expect(
-                wrapper
-                    .findAll('form')
-                    .find((form) => form.find('input[type="file"]').exists())
-                    ?.find('input[name="company_name"]')
-                    .exists(),
-            ).toBe(false);
+            expect(logoForm).toBeDefined();
+            expect(logoForm!.find('input[name="company_name"]').exists()).toBe(
+                false,
+            );
         });
     });
 

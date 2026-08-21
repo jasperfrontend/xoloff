@@ -10,7 +10,6 @@ use App\Support\Audit\AuditLog;
 use App\Support\Pdf\Gotenberg;
 use App\Support\Pdf\PdfUnavailable;
 use App\Support\Quotes\QuoteCalculator;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -90,18 +89,13 @@ final class RenderQuotePdf
      *
      * Gotenberg renders in its own container, so an address pointing back at
      * this application is not necessarily one it can reach - and on a private
-     * network it certainly is not. Embedding sidesteps that entirely.
+     * network it certainly is not. Embedding sidesteps that entirely, and it
+     * puts the logo's bytes inside the document M6 hashes at signing rather
+     * than an address that could later answer with something else.
      */
     private function logo(AppSettings $settings): ?string
     {
-        $path = $settings->logo_path;
-
-        if ($path === null || ! Storage::disk('public')->exists($path)) {
-            return null;
-        }
-
-        return 'data:'.Storage::disk('public')->mimeType($path)
-            .';base64,'.base64_encode(Storage::disk('public')->get($path) ?? '');
+        return $settings->logo()?->toDataUri();
     }
 
     private function filename(Quote $quote, QuoteVersion $version): string

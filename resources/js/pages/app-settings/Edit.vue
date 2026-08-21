@@ -13,8 +13,8 @@ import { edit } from '@/routes/app-settings';
 
 const props = defineProps<{
     settings: {
-        logo_path: string | null;
         logo_url: string | null;
+        logo_preview_url: string | null;
         company_name: string | null;
         company_address: string | null;
         company_kvk: string | null;
@@ -155,25 +155,32 @@ const companyAddress = ref(props.settings.company_address ?? '');
                 <div>
                     <h2 class="font-medium">Logo</h2>
                     <p class="text-sm text-foreground">
-                        Printed at the top of every quote PDF.
+                        Printed at the top of every quote PDF, and shown to the
+                        customer on their quote page.
                     </p>
                 </div>
 
                 <ConfirmDeleteButton
-                    v-if="settings.logo_url"
+                    v-if="settings.logo_preview_url"
                     :action="AppSettingsController.destroyLogo.form()"
                     title="Remove the logo?"
-                    description="Quotes will print without one until a new logo is uploaded. Quotes already downloaded keep the logo they were printed with."
+                    description="Quotes will print without one until another address is saved. Quotes already downloaded keep the logo they were printed with."
                     label="Remove logo"
                 />
             </div>
 
+            <!--
+                The stored copy, not the address it came from. Showing the
+                remote image would prove that something is out there rather
+                than that this application actually holds it, which is the one
+                thing worth seeing here.
+            -->
             <div
                 class="flex h-32 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-4"
             >
                 <img
-                    v-if="settings.logo_url"
-                    :src="settings.logo_url"
+                    v-if="settings.logo_preview_url"
+                    :src="settings.logo_preview_url"
                     alt="The logo printed on quotes"
                     class="max-h-24 max-w-full object-contain"
                 />
@@ -182,7 +189,7 @@ const companyAddress = ref(props.settings.company_address ?? '');
                     class="flex items-center gap-2 text-sm text-foreground"
                 >
                     <ImageOff class="size-4" />
-                    No logo uploaded yet
+                    No logo saved yet
                 </p>
             </div>
 
@@ -192,27 +199,32 @@ const companyAddress = ref(props.settings.company_address ?? '');
                 v-slot="{ errors, processing }"
             >
                 <div class="grid gap-2">
-                    <Label for="logo">
-                        {{ settings.logo_url ? 'Replace logo' : 'Upload logo' }}
-                    </Label>
+                    <Label for="logo_url">Logo address</Label>
                     <Input
-                        id="logo"
-                        name="logo"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        class="cursor-pointer"
+                        id="logo_url"
+                        name="logo_url"
+                        type="url"
+                        inputmode="url"
+                        placeholder="https://xolution.nl/wp-content/uploads/logo.svg"
+                        :default-value="settings.logo_url ?? ''"
                         required
                     />
                     <p class="text-xs text-foreground">
-                        PNG, JPG or WebP, up to 2 MB. A wide, transparent PNG
-                        prints best.
+                        Fetched and stored once, now, so printing a quote never
+                        depends on that address still answering. PNG, JPG, WebP
+                        or SVG. Change the file at that address and press save
+                        again to pick it up.
                     </p>
-                    <InputError :message="errors.logo" />
+                    <InputError :message="errors.logo_url" />
                 </div>
 
                 <div>
                     <Button :disabled="processing">
-                        {{ settings.logo_url ? 'Replace logo' : 'Upload logo' }}
+                        {{
+                            settings.logo_preview_url
+                                ? 'Fetch again'
+                                : 'Save logo'
+                        }}
                     </Button>
                 </div>
             </Form>

@@ -11,9 +11,9 @@ use App\Models\ProductCategory;
 use App\Models\Quote;
 use App\Models\TaxClass;
 use App\Models\User;
+use App\Support\Logo\HostResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -280,22 +280,32 @@ class AuditLogTest extends TestCase
         $this->assertSame('Footer text', $entry->payload['label']);
     }
 
-    public function test_uploading_a_logo_is_recorded()
+    public function test_saving_a_logo_is_recorded()
     {
-        Storage::fake('public');
+        Http::fake(['xolution.test/*' => Http::response('bytes', 200, ['Content-Type' => 'image/png'])]);
+
+        $this->swap(HostResolver::class, new class extends HostResolver
+        {
+            public function resolve(string $host): array
+            {
+                return ['203.0.113.10'];
+            }
+        });
 
         AuditLogEntry::query()->delete();
 
         $this->actingAs(User::factory()->create())
-            ->post(route('app-settings.logo.store'), [
-                'logo' => UploadedFile::fake()->image('xolution.png'),
-            ])
+            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
             ->assertSessionHasNoErrors();
 
         $entry = AuditLogEntry::sole();
 
         $this->assertSame('app_settings', $entry->entity_type);
         $this->assertSame('Application settings', $entry->payload['label']);
+        // The address is worth reading in a log. Fifty kilobytes of base64
+        // beside it would bury every real change around it.
+        $this->assertSame('https://xolution.test/logo.png', $entry->payload['changes']['logo_url']['to']);
+        $this->assertArrayNotHasKey('logo_data', $entry->payload['changes']);
     }
 
     /**

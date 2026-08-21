@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\AppSettingsLogoRequest;
 use App\Http\Requests\AppSettingsRequest;
+use App\Http\Requests\LogoUrlRequest;
 use App\Models\AppSettings;
+use App\Support\Logo\LogoUnavailable;
+use App\Support\Logo\RemoteLogo;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,23 +17,27 @@ use Inertia\Response;
  * details printed alongside it (SPEC §7); the notification toggles arrive
  * in M7.
  *
- * The logo saves through its own route rather than with the rest. A file
- * input cannot be redisplayed with what was submitted, so bundling the two
- * would mean a validation error anywhere on the screen silently dropped the
- * chosen file.
+ * The logo saves through its own route rather than with the rest, because
+ * fetching it can fail for reasons that have nothing to do with the other
+ * fields, and a KvK number should not be held hostage to a web server being
+ * briefly down.
  */
 class AppSettingsController extends Controller
 {
+    public function __construct(private readonly RemoteLogo $remoteLogo) {}
+
     public function edit(): Response
     {
         $settings = AppSettings::current();
 
         return Inertia::render('app-settings/Edit', [
             'settings' => [
-                'logo_path' => $settings->logo_path,
-                'logo_url' => $settings->logo_path === null
-                    ? null
-                    : Storage::disk('public')->url($settings->logo_path),
+                'logo_url' => $settings->logo_url,
+                // The stored bytes, not the address they came from. A preview
+                // of the remote image would show what is out there rather than
+                // what will actually print, which is the one thing this screen
+                // is for.
+                'logo_preview_url' => $settings->hasLogo() ? route('logo.show') : null,
                 'company_name' => $settings->company_name,
                 'company_address' => $settings->company_address,
                 'company_kvk' => $settings->company_kvk,
@@ -52,52 +56,40 @@ class AppSettingsController extends Controller
         return to_route('app-settings.edit');
     }
 
-    public function storeLogo(AppSettingsLogoRequest $request): RedirectResponse
+    /**
+     * Fetches the logo now rather than when a quote is printed.
+     *
+     * A wrong address is then a message under the field, in front of the
+     * person who typed it, instead of a logo missing from a document a client
+     * already has.
+     */
+    public function storeLogo(LogoUrlRequest $request): RedirectResponse
     {
-        $settings = AppSettings::current();
-        $logo = $request->file('logo');
+        $url = $request->string('logo_url')->trim()->toString();
 
-        // Validation has already required it; this narrows the type rather
-        // than asserting it.
-        if (! $logo instanceof UploadedFile) {
-            return back();
+        try {
+            $logo = $this->remoteLogo->fetch($url);
+        } catch (LogoUnavailable $exception) {
+            // The address is handed back so the field keeps what was typed;
+            // correcting a typo should not mean pasting the whole thing again.
+            return back()
+                ->withInput(['logo_url' => $url])
+                ->withErrors(['logo_url' => $exception->getMessage()]);
         }
 
-        // Stored before the old path is dropped, so a failed write cannot leave
-        // the settings pointing at a file that no longer exists.
-        $path = $logo->store('logos', 'public');
+        AppSettings::current()->storeLogo($logo, $url);
 
-        $this->forget($settings->logo_path);
-
-        $settings->update(['logo_path' => $path]);
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Logo uploaded.')]);
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Logo updated.')]);
 
         return to_route('app-settings.edit');
     }
 
     public function destroyLogo(): RedirectResponse
     {
-        $settings = AppSettings::current();
-
-        $this->forget($settings->logo_path);
-
-        $settings->update(['logo_path' => null]);
+        AppSettings::current()->forgetLogo();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Logo removed.')]);
 
         return to_route('app-settings.edit');
-    }
-
-    /**
-     * Quotes never reference the logo file: the PDF embeds whatever the logo is
-     * at the moment it is generated. So removing the old file leaves nothing
-     * pointing at a gap.
-     */
-    private function forget(?string $path): void
-    {
-        if ($path !== null) {
-            Storage::disk('public')->delete($path);
-        }
     }
 }

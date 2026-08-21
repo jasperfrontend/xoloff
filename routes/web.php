@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppSettingsController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\LogoController;
 use App\Http\Controllers\Portal\QuoteDecisionController;
 use App\Http\Controllers\Portal\QuotePortalController;
 use App\Http\Controllers\PremadeTextController;
@@ -20,6 +21,12 @@ use Illuminate\Support\Facades\Route;
 // The root sends you into the app, and the auth middleware bounces guests
 // to the login screen from there.
 Route::redirect('/', '/dashboard')->name('home');
+
+// Xolution's logo, as bytes. Public because the customer's portal shows it and
+// it is the same image they already publish on their own site. The PDF does
+// not come through here - it embeds the bytes, since Gotenberg renders
+// elsewhere and cannot necessarily reach this application.
+Route::get('logo', LogoController::class)->name('logo.show');
 
 // The magic link, and the only page in xoloff a customer ever reaches (SPEC
 // §7). Public by design: the token in the address is the whole credential,
@@ -104,7 +111,7 @@ Route::middleware(['auth'])->group(function () {
     // the chosen file whenever anything else on the screen failed validation.
     Route::get('app-settings', [AppSettingsController::class, 'edit'])->name('app-settings.edit');
     Route::put('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
-    Route::post('app-settings/logo', [AppSettingsController::class, 'storeLogo'])
+    Route::put('app-settings/logo', [AppSettingsController::class, 'storeLogo'])
         ->name('app-settings.logo.store');
     Route::delete('app-settings/logo', [AppSettingsController::class, 'destroyLogo'])
         ->name('app-settings.logo.destroy');

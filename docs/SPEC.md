@@ -107,7 +107,7 @@ A new row is created only on an explicit "Save as new version" action, never aut
 ### `app_settings`
 - `default_validity_days` (default 30)
 - `slack_notifications_enabled`, `helpscout_notifications_enabled` (booleans, toggled in a settings UI)
-- `logo_path`
+- `logo_url`, `logo_mime`, `logo_data` - the logo, fetched from an address Xolution already hosts it at and kept here as bytes. This replaced `logo_path` and the upload screen on 2026-08-21 (see §6).
 - `company_name`, `company_address`, `company_kvk`, `company_vat_number` - Xolution's own identity, printed on the quote PDF. Added in **Milestone 4** (see §7). These live here rather than in the PDF template so they can be corrected without a redeploy.
 - Actual secrets (Slack webhook URL, Help Scout API key/mailbox, SMTP credentials) live in `.env` / GitHub secrets, **not** in this table - see §10.
 
@@ -150,14 +150,22 @@ This is the highest-risk milestone in the project - it's the money math. Give it
 
 **Build:**
 - `premade_texts` with a Vue3-compatible WYSIWYG editor (markdown + basic HTML)
-- Logo upload UI (one-time setup, stored via `app_settings.logo_path`)
+- Logo UI (one-time setup). **Changed 2026-08-21: an address, not an upload.**
 - Versioning: the explicit "Save as new version" action, creating a new `quote_versions` row; a document list showing each quote's current version number (e.g. "V3"), with a way to view and delete old versions
 - The `audit_log` and its browsable, filterable UI
 - PDF export
 
 **PDF export - the settings-page question is resolved, not deferred:** Gotenberg's Chromium engine converts an HTML+CSS document to PDF, so the branded output was always going to be an HTML template under the hood regardless of how the "settings" question was answered. The decision made was to **drop the dynamic font/color settings page (the Bunny Fonts API integration, per-element color pickers) entirely** - not build it later, not stub it. Instead: design **one genuinely good, hardcoded HTML/CSS quote template** with Xolution's branding baked in, and feed it to Gotenberg. If the branding ever needs to change, that's a CSS edit and a redeploy - a perfectly reasonable process for a single-tenant, two-person tool, not a missing feature.
 
-The template must include: the intro/footer text snapshots from the current `quote_version`, the line items with specs and pricing, the calculated (or overridden) totals, the uploaded logo, and the mandatory footer legal text. Page numbering is automatic via Gotenberg - no extra work needed. Trigger: a plain "Download PDF" button on the quote screen. No email, no portal, no e-signature involved yet.
+**The logo is fetched from a URL rather than uploaded.** Originally this was an upload stored at `app_settings.logo_path`. The reason for the change is deployment: an uploaded file makes the filesystem a second stateful thing, needing a mount that exists before the container starts, a `storage:link` inside it, and backups covering two places. For one file of a few dozen kilobytes, the database is the better home - it is already persistent and already backed up.
+
+Three consequences worth knowing:
+
+- **It is fetched when the address is saved, not when a quote is printed.** A wrong address is then a message under the field, in front of the person who typed it, rather than a logo missing from a document a client already has. Printing never depends on anyone else's web server, and Gotenberg needs no outbound access (see §7).
+- **SVG is allowed now, where the upload refused it.** An uploaded SVG was a real risk: it is a document that can carry script and was going to be rendered by a Chromium. Fetched, it only ever reaches an `img` element or a data URI in one, where it is treated as an image and nothing in it runs. It must never be inlined into the page itself.
+- **The fetch is guarded.** This application requests an address a person typed, which is the shape of an SSRF whether or not anyone means it that way, and the host it runs on can reach its own cloud metadata service. https only, no redirects followed, hosts resolving to private or reserved addresses refused, an image content type required, and a 2 MB cap.
+
+The template must include: the intro/footer text snapshots from the current `quote_version`, the line items with specs and pricing, the calculated (or overridden) totals, the logo, and the mandatory footer legal text. Page numbering is automatic via Gotenberg - no extra work needed. Trigger: a plain "Download PDF" button on the quote screen. No email, no portal, no e-signature involved yet.
 
 **Definition of Done:** a quote can be saved as a new version, old versions are listable/viewable/deletable, every CRUD/version/PDF action is visible in the audit log UI with working filters, and the downloaded PDF looks genuinely professional, not just functional.
 

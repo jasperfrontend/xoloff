@@ -11,7 +11,6 @@ use App\Models\QuoteLineItem;
 use App\Models\QuoteVersion;
 use App\Support\Pdf\PdfUnavailable;
 use App\Support\Quotes\QuoteCalculator;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -161,9 +160,9 @@ class QuotePortalController extends Controller
     {
         return [
             'company_name' => $settings->company_name,
-            'logo_url' => $settings->logo_path === null
-                ? null
-                : Storage::disk('public')->url($settings->logo_path),
+            // A link rather than the bytes: the browser caches it, and a page
+            // carrying a data uri would send the logo again on every visit.
+            'logo_url' => $settings->hasLogo() ? route('logo.show') : null,
         ];
     }
 }

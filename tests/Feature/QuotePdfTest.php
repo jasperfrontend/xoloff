@@ -14,7 +14,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -318,23 +317,32 @@ class QuotePdfTest extends TestCase
     {
         Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
 
-        $user = User::factory()->create();
-
-        $this->actingAs($user)->post(route('app-settings.logo.store'), [
-            'logo' => UploadedFile::fake()->image('xolution.png', 400, 120),
+        AppSettings::current()->update([
+            'logo_url' => 'https://xolution.test/logo.png',
+            'logo_mime' => 'image/png',
+            'logo_data' => base64_encode('bytes'),
         ]);
 
-        $this->actingAs($user)->get(route('quotes.pdf', $this->quote()));
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
 
-        Http::assertSent(fn (Request $request): bool => str_contains($request->body(), 'src="data:image/png;base64,')
-            && ! str_contains($request->body(), 'src="/storage/'));
+        Http::assertSent(function (Request $request): bool {
+            $body = $request->body();
+
+            return str_contains($body, 'src="data:image/png;base64,'.base64_encode('bytes'))
+                // Neither a link back to this application, which Gotenberg
+                // cannot rely on reaching, nor the address the logo came from,
+                // which would put someone else's web server in the path of
+                // printing a quote.
+                && ! str_contains($body, 'src="/storage/')
+                && ! str_contains($body, 'https://xolution.test/logo.png');
+        });
     }
 
-    public function test_it_prints_without_a_logo_when_none_was_uploaded()
+    public function test_it_prints_without_a_logo_when_none_was_saved()
     {
         Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
 
-        $this->assertNull(AppSettings::current()->logo_path);
+        $this->assertFalse(AppSettings::current()->hasLogo());
 
         $this->actingAs(User::factory()->create())
             ->get(route('quotes.pdf', $this->quote()))
