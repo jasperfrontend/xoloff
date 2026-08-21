@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppSettingsController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\Portal\QuoteDecisionController;
 use App\Http\Controllers\Portal\QuotePortalController;
 use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
@@ -32,6 +33,13 @@ Route::get('offerte/{quote:magic_link_token}', QuotePortalController::class)
 // a quote id: holding the link is the only thing that grants any of this.
 Route::get('offerte/{quote:magic_link_token}/pdf', [QuotePortalController::class, 'pdf'])
     ->name('portal.quote.pdf');
+
+// Yes or no (SPEC §8). Both are final: a quote is superseded by a new one
+// rather than re-decided.
+Route::post('offerte/{quote:magic_link_token}/akkoord', [QuoteDecisionController::class, 'approve'])
+    ->name('portal.quote.approve');
+Route::post('offerte/{quote:magic_link_token}/afwijzen', [QuoteDecisionController::class, 'deny'])
+    ->name('portal.quote.deny');
 
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

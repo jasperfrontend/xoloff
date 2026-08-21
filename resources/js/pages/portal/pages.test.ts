@@ -1,8 +1,10 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import PortalDecision from '@/pages/portal/Decision.vue';
 import PortalExpired from '@/pages/portal/Expired.vue';
 import PortalQuote from '@/pages/portal/Quote.vue';
 import PortalSender from '@/pages/portal/Sender.vue';
+import { resetInertiaStub, submissions } from '@/test-support/inertia';
 import type { CalculatedQuote } from '@/types';
 
 vi.mock('@inertiajs/vue3', async () =>
@@ -20,6 +22,11 @@ const quote = {
     contact_person: 'Anna',
     valid_until: '2026-09-20',
     pdf_url: '/offerte/abc/pdf',
+    approve_url: '/offerte/abc/akkoord',
+    deny_url: '/offerte/abc/afwijzen',
+    status: 'opened' as const,
+    deny_reason: null,
+    can_decide: true,
 };
 
 const version = {
@@ -232,5 +239,116 @@ describe('portal/Sender', () => {
 
         expect(wrapper.find('img').exists()).toBe(false);
         expect(wrapper.text().trim()).toBe('');
+    });
+});
+
+/**
+ * Yes or no (SPEC §8), and what the page says once one of them has been
+ * chosen.
+ */
+describe('portal/Decision', () => {
+    beforeEach(() => {
+        resetInertiaStub();
+    });
+
+    function buildDecision(overrides: Record<string, unknown> = {}) {
+        return mount(PortalDecision, {
+            props: {
+                approveUrl: '/offerte/abc/akkoord',
+                denyUrl: '/offerte/abc/afwijzen',
+                status: 'opened' as const,
+                denyReason: null,
+                canDecide: true,
+                ...overrides,
+            },
+        });
+    }
+
+    it('asks the question while there is still one to ask', () => {
+        expect(buildDecision().text()).toContain('Gaat u akkoord');
+    });
+
+    it('sends an approval to the address it was given', async () => {
+        const wrapper = buildDecision();
+
+        await wrapper.find('form').trigger('submit');
+
+        expect(submissions).toHaveLength(1);
+        expect(submissions[0].url).toBe('/offerte/abc/akkoord');
+        expect(submissions[0].method).toBe('post');
+    });
+
+    /**
+     * Declining asks for the reason first, which doubles as the pause a
+     * one-click refusal would not have.
+     */
+    it('asks why before it declines', async () => {
+        const wrapper = buildDecision();
+
+        expect(wrapper.find('textarea').exists()).toBe(false);
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Niet akkoord')!
+            .trigger('click');
+
+        expect(wrapper.find('textarea').exists()).toBe(true);
+        expect(wrapper.text()).toContain('niet verplicht');
+    });
+
+    it('sends the reason under the name the server reads', async () => {
+        const wrapper = buildDecision();
+
+        await wrapper
+            .findAll('button')
+            .find((button) => button.text() === 'Niet akkoord')!
+            .trigger('click');
+
+        await wrapper.find('textarea').setValue('Te duur');
+        await wrapper.find('form').trigger('submit');
+
+        expect(submissions).toHaveLength(1);
+        expect(submissions[0].url).toBe('/offerte/abc/afwijzen');
+        expect(submissions[0].data).toEqual({ reason: 'Te duur' });
+    });
+
+    it('stops asking once the quote has been approved', () => {
+        const wrapper = buildDecision({ status: 'approved', canDecide: false });
+
+        expect(wrapper.text()).toContain('geaccepteerd');
+        expect(wrapper.text()).not.toContain('Gaat u akkoord');
+        expect(wrapper.find('form').exists()).toBe(false);
+    });
+
+    /**
+     * Read back rather than only stored, so a note someone took the trouble to
+     * write visibly landed somewhere.
+     */
+    it('repeats the reason back after a denial', () => {
+        const wrapper = buildDecision({
+            status: 'denied',
+            canDecide: false,
+            denyReason: 'Te duur voor dit kwartaal.',
+        });
+
+        expect(wrapper.text()).toContain('afgewezen');
+        expect(wrapper.text()).toContain('Te duur voor dit kwartaal.');
+    });
+
+    it('shows nothing to decide when the reason is absent', () => {
+        const wrapper = buildDecision({ status: 'denied', canDecide: false });
+
+        expect(wrapper.find('blockquote').exists()).toBe(false);
+    });
+
+    /**
+     * Reachable when the quote's last version was removed after it was sent.
+     * There is nothing on the page to agree to.
+     */
+    it('asks nothing when there is nothing to decide on', () => {
+        const wrapper = buildDecision({ canDecide: false });
+
+        expect(wrapper.text()).not.toContain('Gaat u akkoord');
+        expect(wrapper.find('form').exists()).toBe(false);
     });
 });

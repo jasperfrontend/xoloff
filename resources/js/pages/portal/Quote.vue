@@ -3,8 +3,9 @@ import { Head, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { formatDate } from '@/lib/dates';
 import { formatAmount, formatMoney, formatPercentage } from '@/lib/money';
+import PortalDecision from '@/pages/portal/Decision.vue';
 import PortalSender from '@/pages/portal/Sender.vue';
-import type { CalculatedQuote } from '@/types';
+import type { CalculatedQuote, QuoteStatus } from '@/types';
 
 /**
  * The quote as the customer reads it (SPEC §8).
@@ -31,6 +32,11 @@ const props = defineProps<{
         contact_person: string;
         valid_until: string | null;
         pdf_url: string;
+        approve_url: string;
+        deny_url: string;
+        status: QuoteStatus;
+        deny_reason: string | null;
+        can_decide: boolean;
     };
     version: {
         version_number: number;
@@ -283,6 +289,14 @@ function netFor(lineItem: PortalLineItem): string | null {
                 v-html="version.footer_text_snapshot"
             ></div>
         </article>
+
+        <PortalDecision
+            :approve-url="quote.approve_url"
+            :deny-url="quote.deny_url"
+            :status="quote.status"
+            :deny-reason="quote.deny_reason"
+            :can-decide="quote.can_decide"
+        />
 
         <p
             v-if="pdfError"

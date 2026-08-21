@@ -58,7 +58,19 @@ class QuotePortalController extends Controller
                 'company_name' => $quote->customer->company_name,
                 'contact_person' => $quote->customer->contact_person,
                 'valid_until' => $quote->valid_until?->toDateString(),
+                // The token reaches the page only inside the addresses that
+                // need it, never as a value of its own.
                 'pdf_url' => route('portal.quote.pdf', $quote->magic_link_token),
+                'approve_url' => route('portal.quote.approve', $quote->magic_link_token),
+                'deny_url' => route('portal.quote.deny', $quote->magic_link_token),
+                'status' => $quote->status->value,
+                // Read back to them, so a note they took the trouble to write
+                // visibly landed somewhere.
+                'deny_reason' => $quote->deny_reason,
+                // Whether the page should still be asking. A version that went
+                // missing leaves nothing to decide on, and the controller
+                // refuses the same case.
+                'can_decide' => ! $quote->hasBeenDecided() && $version !== null,
             ],
             // Null is reachable only if the quote's last version was removed
             // after it was sent. The page then stands as the cover it was in

@@ -308,32 +308,34 @@ class QuotePortalTest extends TestCase
      * The page is served to whoever holds the link, so what it hands back
      * matters.
      *
-     * The token is in the address, and now legitimately in the props too - the
-     * download link has to be addressable. What this pins is that the download
-     * link is the only place it appears: a credential that has one reason to be
-     * on a page should not quietly acquire a second.
+     * The token is in the address, and legitimately in the props too - the
+     * download and the two decisions all have to be addressable. What this
+     * pins is that those addresses are the only place it appears: a credential
+     * with three reasons to be on a page should not quietly acquire a fourth.
      */
-    public function test_the_token_appears_only_in_the_download_link()
+    public function test_the_token_appears_only_inside_the_addresses_that_need_it()
     {
         $quote = $this->sentQuote();
+        $token = (string) $quote->magic_link_token;
 
         $response = $this->get($this->link($quote))->assertOk();
 
         /** @var array{props: array<string, mixed>} $page */
         $page = $response->viewData('page');
 
+        /** @var array<string, mixed> $quoteProps */
+        $quoteProps = $page['props']['quote'];
+
+        foreach (['pdf_url', 'approve_url', 'deny_url'] as $key) {
+            $this->assertStringContainsString($token, (string) $quoteProps[$key]);
+
+            unset($quoteProps[$key]);
+        }
+
         $props = $page['props'];
-        $this->assertStringContainsString(
-            (string) $quote->magic_link_token,
-            (string) ($props['quote']['pdf_url'] ?? ''),
-        );
+        $props['quote'] = $quoteProps;
 
-        unset($props['quote']['pdf_url']);
-
-        $this->assertStringNotContainsString(
-            (string) $quote->magic_link_token,
-            (string) json_encode($props),
-        );
+        $this->assertStringNotContainsString($token, (string) json_encode($props));
     }
 
     /**

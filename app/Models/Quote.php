@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property CarbonImmutable|null $sent_at
  * @property CarbonImmutable|null $valid_until
  * @property int|null $validity_days_override
+ * @property string|null $deny_reason
  * @property-read Customer $customer
  * @property-read QuoteVersion|null $currentVersion
  */
@@ -64,15 +65,26 @@ class Quote extends Model implements DescribesItselfForAudit
     }
 
     /**
-     * Everything sending writes, all at once. SendQuote records one entry
-     * describing the whole event, so leaving these here would report a send
-     * twice: once as what happened and once as four columns that moved.
+     * Everything an event writes, all at once. The action that causes the
+     * event records one entry describing the whole thing, so leaving these
+     * here would report it twice: once as what happened and once as a set of
+     * columns that moved.
      *
      * @return list<string>
      */
     protected function auditExcept(): array
     {
-        return ['status', 'magic_link_token', 'sent_at', 'valid_until', 'validity_days_override'];
+        return [
+            'status',
+            'magic_link_token',
+            'sent_at',
+            'valid_until',
+            'validity_days_override',
+            // Written at the same moment as the denial, and carried in that
+            // entry's payload. Left here as well, a customer's refusal would
+            // be reported twice.
+            'deny_reason',
+        ];
     }
 
     /**
@@ -82,6 +94,15 @@ class Quote extends Model implements DescribesItselfForAudit
     public function validityDays(): int
     {
         return $this->validity_days_override ?? AppSettings::current()->default_validity_days;
+    }
+
+    /**
+     * Whether the customer has already said yes or no. Both are final: a quote
+     * is not re-decided, it is superseded by a new one.
+     */
+    public function hasBeenDecided(): bool
+    {
+        return in_array($this->status, [QuoteStatus::Approved, QuoteStatus::Denied], true);
     }
 
     /**
