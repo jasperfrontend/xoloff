@@ -37,14 +37,40 @@ return [
 
     'mailers' => [
 
+        /*
+         * Xolution's own relay (SPEC §7): smtp.xolution.nu, with
+         * antispamcloud cleaning on the way out. The .nu is not a typo - the
+         * mail addresses live on .nl and the SMTP host does not.
+         *
+         * The credentials arrived under XOL_ names, so they are read under
+         * those names rather than renamed on the way in, and the MAIL_ keys
+         * stay as the fallback so a machine configured the ordinary Laravel
+         * way still works.
+         */
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
             'url' => env('MAIL_URL'),
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', 2525),
-            'username' => env('MAIL_USERNAME'),
-            'password' => env('MAIL_PASSWORD'),
+            'host' => env('XOL_SMTP', env('MAIL_HOST', '127.0.0.1')),
+
+            // Deliberately not falling through to MAIL_PORT. That one carries
+            // whatever a local mail catcher listens on, and pairing 2525 with
+            // Xolution's relay would fail in a way that looks like a
+            // credentials problem. The XOL_ keys are one unit: naming the host
+            // means naming its port.
+            //
+            // 587 is submission with STARTTLS, which is what a relay like this
+            // normally listens on; 465 and 2525 are the usual alternatives.
+            // A guess rather than a reading - the host answers on none of them
+            // from outside Xolution's own network, so which one it is has to
+            // be told.
+            'port' => env('XOL_SMTP') ? env('XOL_PORT', 587) : env('MAIL_PORT', 2525),
+
+            // Relays of this kind usually authenticate as the address they
+            // send from, so that is the default. XOL_USER is here for the
+            // half of the time it is a separate account instead.
+            'username' => env('XOL_USER', env('XOL_FROM', env('MAIL_USERNAME'))),
+            'password' => env('XOL_PASS', env('MAIL_PASSWORD')),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
@@ -111,7 +137,11 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+        'address' => env('XOL_FROM', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+
+        // Only ever a fallback in practice: App\Mail\QuoteSent puts the
+        // company name from the settings screen beside the address instead, so
+        // a customer's inbox shows Xolution rather than the tool.
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
