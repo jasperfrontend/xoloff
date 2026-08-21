@@ -15,6 +15,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // kamal-proxy terminates TLS and forwards to this container over plain
+        // HTTP, so without this Laravel sees an http request and generates
+        // http:// asset URLs on an https page. The browser then blocks every
+        // stylesheet and script as mixed content, and the app is dead while
+        // the route itself still answers 200.
+        //
+        // Every proxy is trusted because there is exactly one and nothing else
+        // can reach the container: Kamal publishes no ports for the app, so
+        // the only route in is kamal-proxy over the docker network.
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
