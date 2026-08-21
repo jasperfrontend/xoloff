@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Quotes\SaveQuoteVersion;
 use App\Http\Requests\QuoteRequest;
+use App\Models\AppSettings;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quote;
@@ -78,12 +79,28 @@ class QuoteController extends Controller
         // versions at all stays visibly nullable here.
         $version = $quote->currentVersion()->with('lineItems.taxClass')->first();
 
+        $quote->load('customer:id,company_name,email');
+
         return Inertia::render('quotes/Edit', [
             'quote' => [
                 'id' => $quote->id,
                 'customer_id' => $quote->customer_id,
+                'customer_email' => $quote->customer->email,
                 'status' => $quote->status->value,
                 'status_label' => $quote->status->label(),
+                'sent_at' => $quote->sent_at?->toIso8601String(),
+                'valid_until' => $quote->valid_until?->toDateString(),
+                // The window this quote would be sent with, which is its own
+                // answer if it has one and the application default otherwise.
+                // Resolved here so the send dialog does not have to know the
+                // rule.
+                'validity_days' => $quote->validityDays(),
+                'follows_the_default' => $quote->validity_days_override === null,
+                // The whole address rather than the token: the page shows a
+                // link to copy, and half of one would be no use.
+                'magic_link' => $quote->magic_link_token === null
+                    ? null
+                    : route('portal.quote', $quote->magic_link_token),
                 'version_number' => $version->version_number ?? 1,
                 'version_count' => $quote->versions()->count(),
                 'discount_type' => $version?->discount_type,
@@ -101,6 +118,7 @@ class QuoteController extends Controller
                 ])->all(),
             ],
             'totals' => $version === null ? null : $this->calculator->calculate($version),
+            'defaultValidityDays' => AppSettings::current()->default_validity_days,
             ...$this->builderOptions(),
         ]);
     }

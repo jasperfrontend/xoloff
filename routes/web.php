@@ -3,12 +3,14 @@
 use App\Http\Controllers\AppSettingsController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\Portal\QuotePortalController;
 use App\Http\Controllers\PremadeTextController;
 use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\QuotePdfController;
 use App\Http\Controllers\QuotePreviewController;
+use App\Http\Controllers\QuoteSendController;
 use App\Http\Controllers\QuoteVersionController;
 use App\Http\Controllers\TaxClassController;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +19,14 @@ use Illuminate\Support\Facades\Route;
 // The root sends you into the app, and the auth middleware bounces guests
 // to the login screen from there.
 Route::redirect('/', '/dashboard')->name('home');
+
+// The magic link, and the only page in xoloff a customer ever reaches (SPEC
+// §7). Public by design: the token in the address is the whole credential,
+// which is why it is sized like a password and hidden on the model. Dutch in
+// the address because it is read by Dutch customers, not by either of the two
+// people who use the rest of the app.
+Route::get('offerte/{quote:magic_link_token}', QuotePortalController::class)
+    ->name('portal.quote');
 
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
@@ -41,6 +51,11 @@ Route::middleware(['auth'])->group(function () {
     // saves over the current version (SPEC §3).
     Route::post('quotes/{quote}/versions', [QuoteVersionController::class, 'store'])
         ->name('quotes.versions.store');
+
+    // "Send quote" (SPEC §7): issues the magic link, sets the validity
+    // window and moves the quote to sent.
+    Route::post('quotes/{quote}/send', QuoteSendController::class)
+        ->name('quotes.send');
 
     // "Download PDF" (SPEC §6). Two routes rather than one, because a quote
     // already sent has to be reprintable exactly as it went out.

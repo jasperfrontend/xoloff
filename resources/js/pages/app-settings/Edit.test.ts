@@ -17,6 +17,7 @@ const blank: Settings = {
     company_address: null,
     company_kvk: null,
     company_vat_number: null,
+    default_validity_days: 30,
 };
 
 function build(settings: Partial<Settings> = {}) {
@@ -170,19 +171,66 @@ describe('app-settings/Edit', () => {
         });
 
         /**
-         * Two forms on one screen. Sharing one would mean a validation error
-         * on any field silently dropped the chosen file, which a file input
-         * cannot be repopulated with.
+         * The logo saves on its own. Sharing a form would mean a validation
+         * error on any field silently dropped the chosen file, which a file
+         * input cannot be repopulated with.
          */
         it('saves separately from the logo', () => {
             const wrapper = build();
             const forms = wrapper.findAll('form');
 
-            expect(forms).toHaveLength(2);
             expect(forms[0].find('input[type="file"]').exists()).toBe(false);
-            expect(forms[1].find('input[name="company_name"]').exists()).toBe(
-                false,
+            expect(
+                wrapper
+                    .findAll('form')
+                    .find((form) => form.find('input[type="file"]').exists())
+                    ?.find('input[name="company_name"]')
+                    .exists(),
+            ).toBe(false);
+        });
+    });
+
+    /**
+     * How long a quote stays valid once sent (SPEC §7). Sending a quote can
+     * give that one client more leeway without changing this.
+     */
+    describe('the validity window', () => {
+        it('shows the current default', () => {
+            const input = build({ default_validity_days: 45 }).find(
+                'input[name="default_validity_days"]',
             );
+
+            expect((input.element as HTMLInputElement).value).toBe('45');
+        });
+
+        /**
+         * Unlike the company details this one has no blank state: every quote
+         * sent takes its expiry from it.
+         */
+        it('will not be left empty', () => {
+            const input = build().find('input[name="default_validity_days"]');
+
+            expect(input.attributes('required')).toBeDefined();
+            expect(input.attributes('min')).toBe('1');
+            expect(input.attributes('max')).toBe('365');
+        });
+
+        it('submits on its own, without the company details', async () => {
+            const wrapper = build({ default_validity_days: 45 });
+            const form = wrapper
+                .findAll('form')
+                .find((candidate) =>
+                    candidate
+                        .find('input[name="default_validity_days"]')
+                        .exists(),
+                );
+
+            await form!.trigger('submit');
+
+            expect(submissions).toHaveLength(1);
+            expect(submissions[0].data).toEqual({
+                default_validity_days: '45',
+            });
         });
     });
 });

@@ -6,7 +6,9 @@ import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionC
 import Heading from '@/components/Heading.vue';
 import QuoteStatusBadge from '@/components/QuoteStatusBadge.vue';
 import { Button } from '@/components/ui/button';
+import { formatDate, formatDateTime } from '@/lib/dates';
 import QuoteForm from '@/pages/quotes/Form.vue';
+import SendQuoteDialog from '@/pages/quotes/SendQuoteDialog.vue';
 import { index, update } from '@/routes/quotes';
 import { store as storeVersion } from '@/routes/quotes/versions';
 import type {
@@ -21,8 +23,14 @@ import type {
 interface Quote extends QuoteContent {
     id: number;
     customer_id: number | null;
+    customer_email: string;
     status: QuoteStatus;
     status_label: string;
+    sent_at: string | null;
+    valid_until: string | null;
+    validity_days: number;
+    follows_the_default: boolean;
+    magic_link: string | null;
     version_number: number;
     version_count: number;
 }
@@ -41,10 +49,11 @@ defineOptions({
     },
 });
 
-// A refused download redirects back rather than showing a broken file, so the
-// reason has to land somewhere the person can see it.
+// A refused download or a refused send redirects back rather than failing
+// silently, so the reason has to land somewhere the person can see it.
 const page = usePage();
 const pdfError = computed(() => page.props.errors?.pdf);
+const sendError = computed(() => page.props.errors?.send);
 </script>
 
 <template>
@@ -70,6 +79,14 @@ const pdfError = computed(() => page.props.errors?.pdf);
             </div>
 
             <div class="flex items-center gap-2">
+                <SendQuoteDialog
+                    :quote-id="quote.id"
+                    :customer-email="quote.customer_email"
+                    :validity-days="quote.validity_days"
+                    :follows-the-default="quote.follows_the_default"
+                    :already-sent="quote.magic_link !== null"
+                />
+
                 <Button variant="secondary" as-child>
                     <!-- A plain link rather than an Inertia visit: the response
                          is a file, not a page. -->
@@ -93,10 +110,40 @@ const pdfError = computed(() => page.props.errors?.pdf);
         </div>
 
         <div
-            v-if="pdfError"
+            v-if="pdfError || sendError"
             class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-            {{ pdfError }}
+            {{ pdfError ?? sendError }}
+        </div>
+
+        <!--
+            Shown once the quote has been sent. The link is here as well as in
+            the customer's inbox, because an address that bounced or a message
+            that never arrived is exactly when someone needs to pass it on by
+            hand.
+        -->
+        <div
+            v-if="quote.magic_link"
+            class="grid gap-2 rounded-xl border p-4 text-sm"
+        >
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span class="font-medium"
+                    >Sent to {{ quote.customer_email }}</span
+                >
+                <span class="text-foreground">
+                    {{ formatDateTime(quote.sent_at) }}
+                </span>
+                <span v-if="quote.valid_until" class="text-foreground">
+                    Valid until {{ formatDate(quote.valid_until) }}
+                </span>
+            </div>
+
+            <a
+                :href="quote.magic_link"
+                class="cursor-pointer font-mono text-xs break-all underline-offset-4 hover:underline"
+            >
+                {{ quote.magic_link }}
+            </a>
         </div>
 
         <QuoteForm

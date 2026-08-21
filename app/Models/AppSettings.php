@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $company_address
  * @property string|null $company_kvk
  * @property string|null $company_vat_number
+ * @property int $default_validity_days
  */
 class AppSettings extends Model implements DescribesItselfForAudit
 {
@@ -28,7 +29,18 @@ class AppSettings extends Model implements DescribesItselfForAudit
         'company_address',
         'company_kvk',
         'company_vat_number',
+        'default_validity_days',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'default_validity_days' => 'integer',
+        ];
+    }
 
     public function auditLabel(): string
     {

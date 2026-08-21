@@ -38,6 +38,7 @@ class AppSettingsController extends Controller
                 'company_address' => $settings->company_address,
                 'company_kvk' => $settings->company_kvk,
                 'company_vat_number' => $settings->company_vat_number,
+                'default_validity_days' => $settings->default_validity_days,
             ],
         ]);
     }

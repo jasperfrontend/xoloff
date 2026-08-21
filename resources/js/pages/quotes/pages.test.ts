@@ -4,6 +4,7 @@ import QuoteCreate from '@/pages/quotes/Create.vue';
 import QuoteEdit from '@/pages/quotes/Edit.vue';
 import QuoteForm from '@/pages/quotes/Form.vue';
 import QuoteIndex from '@/pages/quotes/Index.vue';
+import SendQuoteDialog from '@/pages/quotes/SendQuoteDialog.vue';
 import QuoteTotals from '@/pages/quotes/Totals.vue';
 import { pageProps, resetInertiaStub } from '@/test-support/inertia';
 import type { CalculatedQuote } from '@/types';
@@ -306,8 +307,14 @@ describe('quotes/Edit', () => {
     const quote = {
         id: 9,
         customer_id: 1,
+        customer_email: 'anna@acme.test',
         status: 'draft' as const,
         status_label: 'Draft',
+        sent_at: null,
+        valid_until: null,
+        validity_days: 30,
+        follows_the_default: true,
+        magic_link: null,
         version_number: 2,
         version_count: 2,
         discount_type: null,
@@ -356,6 +363,87 @@ describe('quotes/Edit', () => {
         });
 
         expect(wrapper.text()).toContain('version 2 of 2');
+    });
+
+    /**
+     * Sending is what M4 adds to this screen (SPEC §7). The dialog is handed
+     * the window the quote would actually go out with, resolved on the server,
+     * so it never has to know the default-versus-override rule itself.
+     */
+    it('offers to send the quote with the window it would go out with', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: {
+                quote: {
+                    ...quote,
+                    validity_days: 45,
+                    follows_the_default: false,
+                },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        const dialog = wrapper.findComponent(SendQuoteDialog);
+
+        expect(dialog.props('validityDays')).toBe(45);
+        expect(dialog.props('followsTheDefault')).toBe(false);
+        expect(dialog.props('customerEmail')).toBe('anna@acme.test');
+        expect(dialog.props('alreadySent')).toBe(false);
+    });
+
+    /**
+     * The link is on this screen as well as in the customer's inbox, because
+     * an address that bounced is exactly when someone needs to pass it on by
+     * hand.
+     */
+    it('shows the link and the window once the quote has been sent', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: {
+                quote: {
+                    ...quote,
+                    status: 'sent',
+                    status_label: 'Sent',
+                    sent_at: '2026-08-21T09:00:00+00:00',
+                    valid_until: '2026-09-20',
+                    magic_link: 'https://xoloff.test/offerte/abc',
+                },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        const link = wrapper
+            .findAll('a')
+            .find((anchor) => anchor.text().includes('/offerte/abc'));
+
+        expect(link?.attributes('href')).toBe(
+            'https://xoloff.test/offerte/abc',
+        );
+        expect(wrapper.text()).toContain('anna@acme.test');
+        expect(wrapper.text()).toContain('20-09-2026');
+        expect(
+            wrapper.findComponent(SendQuoteDialog).props('alreadySent'),
+        ).toBe(true);
+    });
+
+    it('shows no link while the quote has never been sent', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+
+        expect(wrapper.text()).not.toContain('Sent to');
+    });
+
+    it('shows a refused send rather than swallowing it', () => {
+        pageProps.errors = {
+            send: 'This quote has no saved version to send yet.',
+        };
+
+        const wrapper = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+
+        expect(wrapper.text()).toContain('no saved version to send');
     });
 
     /**

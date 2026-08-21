@@ -86,6 +86,21 @@ trait Auditable
     }
 
     /**
+     * Attributes this model records some other way.
+     *
+     * A status change is its own action in the log rather than an "updated"
+     * entry (SPEC §3), and the action that causes one writes it by hand. Left
+     * in here as well, the same event would be reported twice - once as the
+     * thing that happened and once as a column that moved.
+     *
+     * @return list<string>
+     */
+    protected function auditExcept(): array
+    {
+        return [];
+    }
+
+    /**
      * Hidden attributes are excluded by definition rather than by a list, so a
      * password hash or a token added to a model later cannot end up in a
      * payload that people browse.
@@ -97,6 +112,7 @@ trait Auditable
             'created_at',
             'updated_at',
             ...$this->getHidden(),
+            ...$this->auditExcept(),
         ], true);
     }
 }

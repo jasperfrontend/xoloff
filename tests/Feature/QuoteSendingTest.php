@@ -1,0 +1,269 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\AuditAction;
+use App\Enums\QuoteStatus;
+use App\Models\AppSettings;
+use App\Models\AuditLogEntry;
+use App\Models\Customer;
+use App\Models\Quote;
+use App\Models\QuoteVersion;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * Sending a quote and the validity window it goes out with (SPEC §7).
+ */
+class QuoteSendingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_sending_issues_a_link_and_marks_the_quote_sent()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('quotes.edit', $quote));
+
+        $quote->refresh();
+
+        $this->assertSame(QuoteStatus::Sent, $quote->status);
+        $this->assertNotNull($quote->magic_link_token);
+        $this->assertNotNull($quote->sent_at);
+    }
+
+    /**
+     * The token is the customer's whole credential for this quote - no second
+     * factor, no account behind it - so it is sized like a password rather
+     * than like an identifier.
+     */
+    public function test_the_link_is_not_guessable()
+    {
+        $first = $this->quote();
+        $second = $this->quote();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('quotes.send', $first));
+        $this->actingAs($user)->post(route('quotes.send', $second));
+
+        $this->assertSame(64, strlen((string) $first->fresh()->magic_link_token));
+        $this->assertNotSame(
+            $first->fresh()->magic_link_token,
+            $second->fresh()->magic_link_token,
+        );
+    }
+
+    public function test_the_window_follows_the_application_default()
+    {
+        AppSettings::current()->update(['default_validity_days' => 45]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        $this->assertSame(
+            now()->addDays(45)->toDateString(),
+            $quote->fresh()->valid_until?->toDateString(),
+        );
+    }
+
+    public function test_a_quote_can_be_given_more_leeway_than_the_default()
+    {
+        AppSettings::current()->update(['default_validity_days' => 30]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote), ['validity_days' => 60]);
+
+        $quote->refresh();
+
+        $this->assertSame(60, $quote->validity_days_override);
+        $this->assertSame(now()->addDays(60)->toDateString(), $quote->valid_until?->toDateString());
+    }
+
+    /**
+     * Null means "follow the default", so a window that matches it is stored
+     * as no override at all. Writing 30 where the default is 30 would quietly
+     * detach the quote from a later change to that default.
+     */
+    public function test_a_window_matching_the_default_is_not_stored_as_an_override()
+    {
+        AppSettings::current()->update(['default_validity_days' => 30]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote), ['validity_days' => 30]);
+
+        $this->assertNull($quote->fresh()->validity_days_override);
+    }
+
+    public function test_an_absurd_window_is_refused()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote), ['validity_days' => 4000])
+            ->assertSessionHasErrors('validity_days');
+
+        $this->assertSame(QuoteStatus::Draft, $quote->fresh()->status);
+    }
+
+    /**
+     * Both links lead to the same place, so rotating the token would only
+     * break the one already in the customer's inbox.
+     */
+    public function test_sending_again_keeps_the_link_and_moves_the_expiry()
+    {
+        $quote = $this->quote();
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('quotes.send', $quote), ['validity_days' => 10]);
+
+        $token = $quote->fresh()->magic_link_token;
+
+        $this->actingAs($user)->post(route('quotes.send', $quote), ['validity_days' => 60]);
+
+        $quote->refresh();
+
+        $this->assertSame($token, $quote->magic_link_token);
+        $this->assertSame(now()->addDays(60)->toDateString(), $quote->valid_until?->toDateString());
+    }
+
+    /**
+     * A re-send is a new offer to look at, and whether the customer has opened
+     * this one is exactly what the status is for.
+     */
+    public function test_sending_again_puts_an_opened_quote_back_to_sent()
+    {
+        $quote = $this->quote();
+        $quote->forceFill(['status' => QuoteStatus::Opened])->save();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        $this->assertSame(QuoteStatus::Sent, $quote->fresh()->status);
+    }
+
+    public function test_a_quote_with_no_saved_version_cannot_be_sent()
+    {
+        $quote = Quote::factory()->for(Customer::factory())->create();
+
+        $this->actingAs(User::factory()->create())
+            ->from(route('quotes.edit', $quote))
+            ->post(route('quotes.send', $quote))
+            ->assertSessionHasErrors('send');
+
+        $quote->refresh();
+
+        $this->assertSame(QuoteStatus::Draft, $quote->status);
+        $this->assertNull($quote->magic_link_token);
+    }
+
+    public function test_a_guest_cannot_send_anything()
+    {
+        $quote = $this->quote();
+
+        $this->post(route('quotes.send', $quote))->assertRedirect(route('login'));
+
+        $this->assertNull($quote->fresh()->magic_link_token);
+    }
+
+    /**
+     * SPEC §3 makes a status change its own action rather than an "updated"
+     * entry naming a column, and one send is one event however many columns
+     * it writes.
+     */
+    public function test_a_send_is_recorded_once_as_a_status_change()
+    {
+        $quote = $this->quote();
+
+        AuditLogEntry::query()->delete();
+
+        $this->actingAs($user = User::factory()->create())
+            ->post(route('quotes.send', $quote), ['validity_days' => 14]);
+
+        $entry = AuditLogEntry::sole();
+
+        $this->assertSame(AuditAction::StatusChanged, $entry->action);
+        $this->assertSame('quote', $entry->entity_type);
+        $this->assertSame($quote->id, $entry->payload['quote_id']);
+        $this->assertSame($user->id, $entry->user_id);
+        // Compared key by key: jsonb does not preserve the order they were
+        // written in.
+        $this->assertSame('draft', $entry->payload['changes']['status']['from']);
+        $this->assertSame('sent', $entry->payload['changes']['status']['to']);
+        $this->assertSame(14, $entry->payload['attributes']['validity_days']);
+    }
+
+    /**
+     * The audit log is browsable by both users. A credential that reaches the
+     * customer's inbox has no business being readable there as well.
+     */
+    public function test_the_link_never_reaches_the_audit_log()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        $token = (string) $quote->fresh()->magic_link_token;
+
+        foreach (AuditLogEntry::all() as $entry) {
+            $this->assertStringNotContainsString($token, json_encode($entry->payload) ?: '');
+        }
+    }
+
+    public function test_the_edit_screen_shows_the_link_once_the_quote_is_sent()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs($user = User::factory()->create())
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn ($page) => $page->where('quote.magic_link', null));
+
+        $this->actingAs($user)->post(route('quotes.send', $quote));
+
+        $this->actingAs($user)
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn ($page) => $page
+                ->where('quote.magic_link', route('portal.quote', $quote->fresh()->magic_link_token))
+                ->where('quote.valid_until', $quote->fresh()->valid_until?->toDateString()),
+            );
+    }
+
+    public function test_the_edit_screen_offers_the_window_the_quote_would_go_out_with()
+    {
+        AppSettings::current()->update(['default_validity_days' => 21]);
+
+        $quote = $this->quote();
+
+        $this->actingAs($user = User::factory()->create())
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn ($page) => $page
+                ->where('quote.validity_days', 21)
+                ->where('quote.follows_the_default', true),
+            );
+
+        $this->actingAs($user)->post(route('quotes.send', $quote), ['validity_days' => 90]);
+
+        $this->actingAs($user)
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn ($page) => $page
+                ->where('quote.validity_days', 90)
+                ->where('quote.follows_the_default', false),
+            );
+    }
+
+    private function quote(): Quote
+    {
+        $quote = Quote::factory()->for(Customer::factory())->create();
+
+        QuoteVersion::factory()->for($quote)->create(['version_number' => 1]);
+
+        return $quote->fresh();
+    }
+}

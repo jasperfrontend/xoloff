@@ -19,6 +19,7 @@ const props = defineProps<{
         company_address: string | null;
         company_kvk: string | null;
         company_vat_number: string | null;
+        default_validity_days: number;
     };
 }>();
 
@@ -103,6 +104,48 @@ const companyAddress = ref(props.settings.company_address ?? '');
 
                 <div>
                     <Button :disabled="processing">Save details</Button>
+                </div>
+            </Form>
+        </div>
+
+        <div class="grid max-w-lg gap-4 rounded-xl border p-4">
+            <div>
+                <h2 class="font-medium">Quotes</h2>
+                <p class="text-sm text-foreground">
+                    How long a quote stays valid after it is sent.
+                </p>
+            </div>
+
+            <Form
+                v-bind="AppSettingsController.update.form()"
+                class="grid gap-4"
+                v-slot="{ errors, processing }"
+            >
+                <div class="grid gap-2">
+                    <Label for="default_validity_days">Valid for</Label>
+                    <div class="flex items-center gap-2">
+                        <Input
+                            id="default_validity_days"
+                            name="default_validity_days"
+                            type="number"
+                            min="1"
+                            max="365"
+                            class="w-24"
+                            :default-value="settings.default_validity_days"
+                            required
+                        />
+                        <span class="text-sm text-foreground">days</span>
+                    </div>
+                    <p class="text-xs text-foreground">
+                        The starting point for every quote. A single quote can
+                        be given a longer window when you send it, without
+                        changing this.
+                    </p>
+                    <InputError :message="errors.default_validity_days" />
+                </div>
+
+                <div>
+                    <Button :disabled="processing">Save</Button>
                 </div>
             </Form>
         </div>
