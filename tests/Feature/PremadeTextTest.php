@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Placeholder;
 use App\Enums\PremadeTextKey;
 use App\Models\Customer;
 use App\Models\PremadeText;
@@ -16,6 +17,22 @@ use Tests\TestCase;
 class PremadeTextTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Built from the enum that resolves them, so the list the editor offers
+     * and the list that actually fills in cannot drift apart.
+     */
+    public function test_the_editor_is_told_which_placeholders_exist()
+    {
+        $this->actingAs(User::factory()->create())
+            ->get(route('premade-texts.edit'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('placeholders', count(Placeholder::cases()))
+                ->where('placeholders.0.token', '[[[customer_salutation]]]')
+                ->where('placeholders.0.label', 'Salutation')
+                ->where('placeholders.0.example', 'heer'),
+            );
+    }
 
     public function test_the_editor_shows_both_texts()
     {

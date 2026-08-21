@@ -203,6 +203,46 @@ describe('RichTextEditor', () => {
      * Writing the incoming value back on every keystroke would send the caret
      * to the top of the document each time a character was typed.
      */
+    /**
+     * Placeholders are inserted by buttons that live outside the editor, so
+     * "where the caret last was" is the whole contract. Covered here, against
+     * the real TipTap, rather than in the page that draws those buttons.
+     */
+    it('inserts text where the caret last was', async () => {
+        const wrapper = build('<p>Beste ,</p>');
+        await settle(wrapper);
+
+        // Between "Beste " and the comma. Positions count from 1, since 0 is
+        // before the paragraph itself.
+        editorOf(wrapper).commands.setTextSelection(7);
+
+        (wrapper.vm as unknown as { insert: (text: string) => void }).insert(
+            '[[[customer_first_name]]]',
+        );
+        await settle(wrapper);
+
+        expect(latestValue(wrapper)).toBe(
+            '<p>Beste [[[customer_first_name]]],</p>',
+        );
+    });
+
+    /**
+     * The token is plain text. If the editor ever decided a placeholder looked
+     * like markup, the sanitiser would strip it on save and the quote would
+     * silently lose its greeting.
+     */
+    it('keeps an inserted placeholder as plain text', async () => {
+        const wrapper = build('<p></p>');
+        await settle(wrapper);
+
+        (wrapper.vm as unknown as { insert: (text: string) => void }).insert(
+            '[[[customer_company_name]]]',
+        );
+        await settle(wrapper);
+
+        expect(latestValue(wrapper)).toBe('<p>[[[customer_company_name]]]</p>');
+    });
+
     it('does not rewrite the document when the value has not changed', async () => {
         const wrapper = build();
         const setContent = vi.spyOn(editorOf(wrapper).commands, 'setContent');

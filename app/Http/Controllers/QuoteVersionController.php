@@ -141,6 +141,7 @@ class QuoteVersionController extends Controller
             $nextVersionNumber = (int) $quote->versions()->max('version_number') + 1;
 
             $this->saveQuoteVersion->handle(
+                $quote,
                 new QuoteVersion([
                     'quote_id' => $quote->id,
                     'version_number' => $nextVersionNumber,

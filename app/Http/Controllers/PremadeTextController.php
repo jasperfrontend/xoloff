@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PremadeTextKey;
 use App\Http\Requests\PremadeTextRequest;
 use App\Models\PremadeText;
+use App\Support\Text\Placeholders;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,6 +24,10 @@ class PremadeTextController extends Controller
                 PremadeTextKey::Intro->value => PremadeText::contentFor(PremadeTextKey::Intro),
                 PremadeTextKey::Footer->value => PremadeText::contentFor(PremadeTextKey::Footer),
             ],
+            // What can be dropped into either text. Built from the enum that
+            // resolves them, so the list offered here and the list that
+            // actually fills in cannot drift apart.
+            'placeholders' => Placeholders::all(),
         ]);
     }
 

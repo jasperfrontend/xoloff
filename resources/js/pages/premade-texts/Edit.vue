@@ -4,16 +4,19 @@ import { ref } from 'vue';
 import PremadeTextController from '@/actions/App/Http/Controllers/PremadeTextController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PlaceholderPicker from '@/components/PlaceholderPicker.vue';
 import RichTextEditor from '@/components/RichTextEditor.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/premade-texts';
+import type { PlaceholderOption } from '@/types';
 
 const props = defineProps<{
     texts: {
         intro: string;
         footer: string;
     };
+    placeholders: PlaceholderOption[];
 }>();
 
 defineOptions({
@@ -26,6 +29,12 @@ defineOptions({
 // field for the form to submit.
 const intro = ref(props.texts.intro);
 const footer = ref(props.texts.footer);
+
+// Reached into rather than driven by a prop, because inserting at the caret is
+// something only the editor knows how to do: the position is inside its own
+// document, not in the string this page holds.
+const introEditor = ref<InstanceType<typeof RichTextEditor> | null>(null);
+const footerEditor = ref<InstanceType<typeof RichTextEditor> | null>(null);
 </script>
 
 <template>
@@ -46,9 +55,15 @@ const footer = ref(props.texts.footer);
             <div class="grid gap-2">
                 <Label for="intro">Intro</Label>
                 <RichTextEditor
+                    ref="introEditor"
                     v-model="intro"
                     label="Intro text"
                     described-by="intro-help"
+                />
+                <PlaceholderPicker
+                    :placeholders="placeholders"
+                    describes="the intro text"
+                    @insert="introEditor?.insert($event)"
                 />
                 <input type="hidden" name="intro" :value="intro" />
                 <p id="intro-help" class="text-xs text-foreground">
@@ -61,9 +76,15 @@ const footer = ref(props.texts.footer);
             <div class="grid gap-2">
                 <Label for="footer">Footer</Label>
                 <RichTextEditor
+                    ref="footerEditor"
                     v-model="footer"
                     label="Footer text"
                     described-by="footer-help"
+                />
+                <PlaceholderPicker
+                    :placeholders="placeholders"
+                    describes="the footer text"
+                    @insert="footerEditor?.insert($event)"
                 />
                 <input type="hidden" name="footer" :value="footer" />
                 <p id="footer-help" class="text-xs text-foreground">
@@ -77,7 +98,8 @@ const footer = ref(props.texts.footer);
                 Quotes keep a copy of both texts from the moment they were
                 saved, so editing here never changes a quote that has already
                 gone out. Save a quote as a new version to give it the current
-                wording.
+                wording. Placeholders are filled in at that same moment, with
+                the customer the quote is going to.
             </p>
 
             <Button :disabled="processing">Save texts</Button>

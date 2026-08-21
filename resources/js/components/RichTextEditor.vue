@@ -73,6 +73,20 @@ watch(
 
 onBeforeUnmount(() => editor.value?.destroy());
 
+/**
+ * Drops text in wherever the caret last was.
+ *
+ * focus() is what restores that position: a button outside the editor takes
+ * the selection with it unless the click is prevented, and even then TipTap
+ * needs telling to come back. The caller is responsible for the mousedown
+ * half - see the toolbar below, which does the same thing.
+ */
+function insert(text: string): void {
+    editor.value?.chain().focus().insertContent(text).run();
+}
+
+defineExpose({ insert });
+
 interface ToolbarAction {
     label: string;
     icon: unknown;

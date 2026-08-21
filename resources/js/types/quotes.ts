@@ -1,3 +1,14 @@
+/**
+ * Mirrors one entry of App\Support\Text\Placeholders::all(): something that
+ * can be dropped into a quote text and becomes customer data when a version is
+ * saved.
+ */
+export interface PlaceholderOption {
+    token: string;
+    label: string;
+    example: string;
+}
+
 /** Mirrors App\Enums\QuoteStatus. */
 export type QuoteStatus = 'draft' | 'sent' | 'opened' | 'approved' | 'denied';
 

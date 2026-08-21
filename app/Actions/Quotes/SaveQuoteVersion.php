@@ -5,8 +5,10 @@ namespace App\Actions\Quotes;
 use App\Enums\AuditAction;
 use App\Enums\PremadeTextKey;
 use App\Models\PremadeText;
+use App\Models\Quote;
 use App\Models\QuoteVersion;
 use App\Support\Audit\AuditLog;
+use App\Support\Text\Placeholders;
 
 /**
  * Writes submitted builder content onto a quote version. Shared by saving the
@@ -16,10 +18,16 @@ use App\Support\Audit\AuditLog;
 final class SaveQuoteVersion
 {
     /**
+     * @param  Quote  $quote  the quote this version belongs to, for the placeholders in its texts
      * @param  array<string, mixed>  $data
      */
-    public function handle(QuoteVersion $version, array $data): QuoteVersion
+    public function handle(Quote $quote, QuoteVersion $version, array $data): QuoteVersion
     {
+        // Loaded rather than lazily reached for: saving a quote can have just
+        // moved it to a different customer, and the snapshot below has to
+        // greet the one it is going to now.
+        $quote->load('customer');
+
         $isNew = ! $version->exists;
         $before = $isNew ? [] : $this->snapshot($version);
 
@@ -34,8 +42,12 @@ final class SaveQuoteVersion
             // this protects is the versions behind it: once superseded, a
             // version is never written to again, so the wording a customer saw
             // or signed survives any later edit to the global texts.
-            'intro_text_snapshot' => PremadeText::contentFor(PremadeTextKey::Intro),
-            'footer_text_snapshot' => PremadeText::contentFor(PremadeTextKey::Footer),
+            //
+            // Placeholders are filled here for the same reason, and not when
+            // the page or the PDF is rendered: a snapshot that still had to be
+            // resolved would be a hole straight through the guarantee above.
+            'intro_text_snapshot' => $this->snapshotText(PremadeTextKey::Intro, $quote),
+            'footer_text_snapshot' => $this->snapshotText(PremadeTextKey::Footer, $quote),
         ])->save();
 
         // Lines are replaced wholesale rather than diffed, matching how product
@@ -64,6 +76,15 @@ final class SaveQuoteVersion
         $this->record($version, $isNew, $before);
 
         return $version;
+    }
+
+    /**
+     * One of the global texts, with its placeholders turned into this quote's
+     * customer.
+     */
+    private function snapshotText(PremadeTextKey $key, Quote $quote): string
+    {
+        return Placeholders::fill(PremadeText::contentFor($key), $quote->customer);
     }
 
     /**

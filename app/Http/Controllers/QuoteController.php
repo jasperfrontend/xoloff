@@ -61,6 +61,7 @@ class QuoteController extends Controller
             $quote = Quote::create(['customer_id' => $data['customer_id']]);
 
             $this->saveQuoteVersion->handle(
+                $quote,
                 new QuoteVersion(['quote_id' => $quote->id, 'version_number' => 1]),
                 $data,
             );
@@ -142,7 +143,7 @@ class QuoteController extends Controller
             $version = $quote->currentVersion
                 ?? new QuoteVersion(['quote_id' => $quote->id, 'version_number' => 1]);
 
-            $this->saveQuoteVersion->handle($version, $data);
+            $this->saveQuoteVersion->handle($quote, $version, $data);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Quote saved.')]);
