@@ -298,7 +298,37 @@ class QuoteSendingTest extends TestCase
             return str_contains($rendered, route('portal.quote', $quote->magic_link_token))
                 && str_contains($rendered, $quote->valid_until->format('d-m-Y'))
                 && str_contains($rendered, 'Bekijk de offerte')
-                && str_contains($rendered, $quote->customer->contact_person);
+                // Escaped, because this half is HTML and the name has an
+                // apostrophe in it. The text half must not be - see below.
+                && str_contains($rendered, e($quote->customer->contact_person));
+        });
+    }
+
+    /**
+     * The plain-text alternative is text/plain, where escaping has nothing to
+     * escape for and everything to spoil: "Anna O'Brien" arriving as "Anna
+     * O&#039;Brien" is what a customer would actually read.
+     *
+     * Rendered through the mailable's own content definition rather than by
+     * naming the view here, so renaming or dropping the text half fails this
+     * rather than quietly passing.
+     */
+    public function test_the_plain_text_half_is_not_html_escaped()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        Mail::assertSent(QuoteSent::class, function (QuoteSent $mail): bool {
+            $content = $mail->content();
+
+            $text = view((string) $content->text, [
+                ...$content->with,
+                'quote' => $mail->quote,
+            ])->render();
+
+            return str_contains($text, "Anna O'Brien")
+                && ! str_contains($text, '&#039;');
         });
     }
 
@@ -392,9 +422,20 @@ class QuoteSendingTest extends TestCase
         $this->assertFalse($entry->payload['attributes']['delivered']);
     }
 
+    /**
+     * The contact name is pinned rather than left to the factory, and pinned to
+     * one with an apostrophe in it.
+     *
+     * A faker name is a coin toss over whether it contains a character HTML
+     * escapes, and these assertions turn on exactly that: CI failed on an
+     * O'-name that the local run had never produced. Choosing the awkward case
+     * on purpose is both deterministic and the more useful thing to cover.
+     */
     private function quote(): Quote
     {
-        $quote = Quote::factory()->for(Customer::factory())->create();
+        $quote = Quote::factory()
+            ->for(Customer::factory()->state(['first_name' => 'Anna', 'last_name' => "O'Brien"]))
+            ->create();
 
         QuoteVersion::factory()->for($quote)->create(['version_number' => 1]);
 
