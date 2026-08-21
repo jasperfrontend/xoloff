@@ -5,11 +5,12 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The address the logo is fetched from.
+ * The two addresses the logo is fetched from.
  *
- * Whether anything usable lives there is not a question validation can answer,
- * so it only checks the shape. App\Support\Logo\RemoteLogo does the rest and
- * reports back in the same place.
+ * Both are optional and both are allowed to be empty, because clearing an
+ * address is how that logo is removed. Whether anything usable lives at either
+ * one is not a question validation can answer - App\Support\Logo\RemoteLogo
+ * does that and reports back against the same field.
  */
 class LogoUrlRequest extends FormRequest
 {
@@ -19,10 +20,8 @@ class LogoUrlRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Required, because pasting nothing and pressing save should say
-            // so rather than appear to work. Removing the logo has its own
-            // button.
-            'logo_url' => ['required', 'url:https', 'max:2048'],
+            'logo_vector_url' => ['nullable', 'url:https', 'max:2048'],
+            'logo_raster_url' => ['nullable', 'url:https', 'max:2048'],
         ];
     }
 
@@ -32,7 +31,8 @@ class LogoUrlRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'logo_url' => __('logo address'),
+            'logo_vector_url' => __('SVG address'),
+            'logo_raster_url' => __('PNG or JPG address'),
         ];
     }
 
@@ -41,12 +41,12 @@ class LogoUrlRequest extends FormRequest
      */
     public function messages(): array
     {
+        // Laravel's default names the rule rather than the reason, and the
+        // reason is worth saying: these images end up on documents and in
+        // messages that go to clients.
         return [
-            'logo_url.required' => __('Paste the address the logo lives at.'),
-            // Laravel's default names the rule rather than the reason, and the
-            // reason here is worth saying: this image ends up on a document
-            // that goes to clients.
-            'logo_url.url' => __('That is not an https address. A logo fetched over plain http can be tampered with on the way here.'),
+            'logo_vector_url.url' => __('That is not an https address. A logo fetched over plain http can be tampered with on the way here.'),
+            'logo_raster_url.url' => __('That is not an https address. A logo fetched over plain http can be tampered with on the way here.'),
         ];
     }
 }

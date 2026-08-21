@@ -8,24 +8,28 @@ use App\Models\User;
 use App\Support\Logo\HostResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * The logo is fetched from an address Xolution already hosts it at, and its
- * bytes are kept in the database rather than on disk.
+ * Two logos, fetched from addresses Xolution already hosts, kept in the
+ * database rather than on disk.
+ *
+ * Two because no single file works everywhere. An SVG is what the portal and
+ * the PDF want - sharp at any size, and a quarter the file - but email clients
+ * mostly refuse to render one: Gmail strips it and Outlook will not draw it.
+ * Either alone is enough; both is better.
  *
  * Not what SPEC §6 describes, which says "logo upload UI ... stored via
- * app_settings.logo_path". The reason for the change is deployment: an
+ * app_settings.logo_path". Moving off disk was a deployment decision: an
  * uploaded file makes the filesystem a second stateful thing, needing a mount
- * that exists before the container starts and backups that cover two places.
- * For one file of a few dozen kilobytes the database is the better home.
+ * that exists before the container starts and backups covering two places.
  */
 class LogoTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** A PNG's magic bytes, so what these tests move around is really an image. */
-    private const PNG = "\x89PNG\r\n\x1a\n";
+    private const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 30"></svg>';
 
     /**
      * xolution.test does not resolve, and should not: a test that depends on
@@ -41,128 +45,188 @@ class LogoTest extends TestCase
         $this->resolveTestHostsTo('203.0.113.10');
     }
 
-    private function resolveTestHostsTo(string $address): void
+    public function test_each_field_keeps_its_own_kind()
     {
-        $this->swap(HostResolver::class, new class($address) extends HostResolver
-        {
-            public function __construct(private readonly string $address) {}
+        $this->fakeBothKinds();
 
-            public function resolve(string $host): array
-            {
-                return [$this->address];
-            }
-        });
-    }
-
-    public function test_a_logo_is_fetched_and_kept()
-    {
-        Http::fake(['xolution.test/*' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png'])]);
-
-        $this->actingAs(User::factory()->create())
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
-            ->assertSessionHasNoErrors()
-            ->assertRedirect(route('app-settings.edit'));
+        $this->save([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ])->assertSessionHasNoErrors();
 
         $settings = AppSettings::current();
 
-        $this->assertSame('https://xolution.test/logo.png', $settings->logo_url);
-        $this->assertSame('image/png', $settings->logo_mime);
-        $this->assertSame(self::PNG, $settings->logo()?->bytes);
+        $this->assertSame('image/svg+xml', $settings->logo_vector_mime);
+        $this->assertSame('image/png', $settings->logo_raster_mime);
+        $this->assertSame(self::SVG, $settings->webLogo()?->bytes);
     }
 
     /**
-     * The whole point of storing the bytes: printing a quote must not depend
-     * on someone else's web server still answering.
+     * The whole reason there are two. Falling back to the vector here would
+     * mean sending a broken image rather than none, and a broken image is
+     * worse: it leaves a placeholder box where a missing one leaves nothing.
      */
-    public function test_printing_a_quote_never_refetches_the_logo()
+    public function test_email_gets_no_logo_when_only_a_vector_was_given()
     {
-        $this->storeALogo();
+        $this->fakeBothKinds();
 
-        Http::fake();
+        $this->save(['logo_vector_url' => 'https://xolution.test/logo.svg']);
 
-        $this->assertNotNull(AppSettings::current()->logo());
+        $settings = AppSettings::current();
 
-        Http::assertNothingSent();
-    }
-
-    /**
-     * Gotenberg renders elsewhere and cannot necessarily reach this
-     * application, and M6 hashes the rendered document at signing - a linked
-     * image would leave that hash covering an address rather than what the
-     * signer saw.
-     */
-    public function test_the_pdf_embeds_the_stored_bytes()
-    {
-        $this->storeALogo();
-
-        $this->assertSame(
-            'data:image/png;base64,'.base64_encode(self::PNG),
-            AppSettings::current()->logo()?->toDataUri(),
-        );
-    }
-
-    public function test_the_screen_shows_the_stored_copy_rather_than_the_remote_one()
-    {
-        $this->storeALogo();
-
-        $this->actingAs(User::factory()->create())
-            ->get(route('app-settings.edit'))
-            ->assertInertia(fn ($page) => $page
-                // The address, so the field keeps it; the preview, so what is
-                // shown is what will actually print.
-                ->where('settings.logo_url', 'https://xolution.test/logo.png')
-                ->where('settings.logo_preview_url', route('logo.show')),
-            );
-    }
-
-    public function test_the_stored_logo_is_served_to_a_browser()
-    {
-        $this->storeALogo();
-
-        $response = $this->get(route('logo.show'))->assertOk();
-
-        $response->assertHeader('content-type', 'image/png');
-        $this->assertSame(self::PNG, $response->getContent());
-    }
-
-    /**
-     * The customer's portal shows it, and it is the same image Xolution
-     * already publishes on their own website.
-     */
-    public function test_the_logo_needs_no_sign_in()
-    {
-        $this->storeALogo();
+        $this->assertNotNull($settings->webLogo());
+        $this->assertNull($settings->emailLogo());
 
         $this->get(route('logo.show'))->assertOk();
+        $this->get(route('logo.email'))->assertNotFound();
     }
 
-    public function test_there_is_no_logo_to_serve_before_one_is_saved()
+    /**
+     * Someone with only a PNG should not have to find an SVG to use this.
+     */
+    public function test_a_raster_alone_serves_every_purpose()
     {
-        $this->get(route('logo.show'))->assertNotFound();
-    }
+        $this->fakeBothKinds();
 
-    public function test_a_logo_can_be_removed()
-    {
-        $this->storeALogo();
-
-        $this->actingAs(User::factory()->create())
-            ->delete(route('app-settings.logo.destroy'))
-            ->assertRedirect(route('app-settings.edit'));
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png']);
 
         $settings = AppSettings::current();
 
-        $this->assertNull($settings->logo_url);
-        $this->assertNull($settings->logo_mime);
-        $this->assertNull($settings->logo_data);
+        $this->assertSame('image/png', $settings->webLogo()?->mime);
+        $this->assertSame('image/png', $settings->emailLogo()?->mime);
+
+        $this->get(route('logo.show'))->assertOk();
+        $this->get(route('logo.email'))->assertOk();
     }
 
-    public function test_removing_a_logo_that_is_not_there_is_harmless()
+    public function test_the_vector_is_preferred_for_screens_and_print()
     {
-        $this->actingAs(User::factory()->create())
-            ->delete(route('app-settings.logo.destroy'))
-            ->assertRedirect(route('app-settings.edit'));
+        $this->fakeBothKinds();
 
-        $this->assertFalse(AppSettings::current()->hasLogo());
+        $this->save([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ]);
+
+        $this->assertSame('image/svg+xml', AppSettings::current()->webLogo()?->mime);
+    }
+
+    /**
+     * A perfectly good image in the wrong box is a mistake worth naming
+     * precisely, rather than answering "not an image".
+     */
+    public function test_a_raster_in_the_vector_field_is_refused()
+    {
+        $this->fakeBothKinds();
+
+        $this->save(['logo_vector_url' => 'https://xolution.test/logo.png'])
+            ->assertSessionHasErrors(['logo_vector_url' => 'That address returned image/png, and this field takes an SVG.']);
+    }
+
+    public function test_a_vector_in_the_raster_field_is_refused()
+    {
+        $this->fakeBothKinds();
+
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.svg'])
+            ->assertSessionHasErrors(['logo_raster_url' => 'That address returned image/svg+xml, and this field takes a PNG, JPG or WebP.']);
+    }
+
+    /**
+     * Clearing an address is how a logo is removed, so there is no separate
+     * delete that could fall out of step with the save.
+     */
+    public function test_clearing_an_address_removes_that_logo()
+    {
+        $this->fakeBothKinds();
+
+        $this->save([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ]);
+
+        $this->save([
+            'logo_vector_url' => '',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ])->assertSessionHasNoErrors();
+
+        $settings = AppSettings::current();
+
+        $this->assertNull($settings->logo_vector_mime);
+        $this->assertSame('image/png', $settings->logo_raster_mime);
+    }
+
+    /**
+     * Saving one field must not refetch the other, or a logo could be lost to
+     * a web server that happened to be down while an unrelated edit was made.
+     */
+    public function test_an_unchanged_address_is_not_fetched_again()
+    {
+        $this->fakeBothKinds();
+
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png']);
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png'])
+            ->assertSessionHasNoErrors();
+
+        // Counted rather than faked into failing on the second call: a second
+        // Http::fake appends its stub rather than replacing the first, so the
+        // original would keep answering and this would pass either way.
+        Http::assertSentCount(1);
+
+        $this->assertSame('image/png', AppSettings::current()->logo_raster_mime);
+    }
+
+    /**
+     * Saved anyway. A logo smaller than ideal is still a logo, and refusing it
+     * would be this application having an opinion about someone's artwork.
+     */
+    public function test_a_narrow_raster_warns_but_is_still_kept()
+    {
+        Http::fake(['xolution.test/*' => Http::response(
+            $this->png(200, 60),
+            200,
+            ['Content-Type' => 'image/png'],
+        )]);
+
+        $this->save(['logo_raster_url' => 'https://xolution.test/small.png'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue(AppSettings::current()->hasEmailLogo());
+    }
+
+    public function test_the_stored_logos_are_served_to_a_browser()
+    {
+        $this->fakeBothKinds();
+
+        $this->save([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ]);
+
+        $web = $this->get(route('logo.show'))->assertOk();
+        $web->assertHeader('content-type', 'image/svg+xml');
+        $this->assertSame(self::SVG, $web->getContent());
+
+        $this->get(route('logo.email'))->assertOk()->assertHeader('content-type', 'image/png');
+    }
+
+    /**
+     * The customer's portal shows one and a quote email links the other, and
+     * both are images Xolution already publishes on their own website.
+     */
+    public function test_the_logos_need_no_sign_in()
+    {
+        $this->fakeBothKinds();
+
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png']);
+
+        $this->get(route('logo.show'))->assertOk();
+        $this->get(route('logo.email'))->assertOk();
+    }
+
+    public function test_there_is_nothing_to_serve_before_a_logo_is_saved()
+    {
+        $this->get(route('logo.show'))->assertNotFound();
+        $this->get(route('logo.email'))->assertNotFound();
     }
 
     /**
@@ -171,59 +235,27 @@ class LogoTest extends TestCase
      */
     public function test_an_address_that_is_not_there_says_so_and_keeps_the_old_logo()
     {
-        // A sequence rather than two Http::fake calls: the second call appends
-        // its stub rather than replacing the first, so the original would keep
-        // matching and this would quietly pass.
         Http::fake(['xolution.test/*' => Http::sequence()
-            ->push(self::PNG, 200, ['Content-Type' => 'image/png'])
+            ->push($this->png(600, 180), 200, ['Content-Type' => 'image/png'])
             ->push('nope', 404)]);
 
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png'])
             ->assertSessionHasNoErrors();
 
-        $this->actingAs($user)
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/gone.png'])
-            ->assertSessionHasErrors('logo_url');
+        $this->save(['logo_raster_url' => 'https://xolution.test/gone.png'])
+            ->assertSessionHasErrors('logo_raster_url');
 
-        // The one that worked is still there rather than cleared by a failed
-        // attempt to replace it.
-        $this->assertSame('https://xolution.test/logo.png', AppSettings::current()->logo_url);
+        $this->assertSame('https://xolution.test/logo.png', AppSettings::current()->logo_raster_url);
     }
 
-    public function test_something_that_is_not_an_image_is_refused()
+    public function test_something_that_is_not_an_image_at_all_is_refused()
     {
         Http::fake(['xolution.test/*' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html'])]);
 
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/oops.html'])
-            ->assertSessionHasErrors('logo_url');
+        $this->save(['logo_raster_url' => 'https://xolution.test/oops.html'])
+            ->assertSessionHasErrors('logo_raster_url');
 
-        $this->assertFalse(AppSettings::current()->hasLogo());
-    }
-
-    /**
-     * SVG was refused as an upload because it is a document that can carry
-     * script and would have been rendered by a Chromium. Fetched here it only
-     * ever reaches an img element, where it is treated as an image and nothing
-     * in it runs.
-     */
-    public function test_an_svg_is_accepted_now_that_it_is_only_ever_an_image()
-    {
-        $svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
-
-        Http::fake(['xolution.test/*' => Http::response($svg, 200, ['Content-Type' => 'image/svg+xml; charset=utf-8'])]);
-
-        $this->actingAs(User::factory()->create())
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.svg'])
-            ->assertSessionHasNoErrors();
-
-        // The charset is not part of the type, and it would break a data uri.
-        $this->assertSame('image/svg+xml', AppSettings::current()->logo_mime);
+        $this->assertFalse(AppSettings::current()->hasEmailLogo());
     }
 
     public function test_an_enormous_image_is_refused()
@@ -234,20 +266,16 @@ class LogoTest extends TestCase
             ['Content-Type' => 'image/png'],
         )]);
 
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/huge.png'])
-            ->assertSessionHasErrors('logo_url');
+        $this->save(['logo_raster_url' => 'https://xolution.test/huge.png'])
+            ->assertSessionHasErrors('logo_raster_url');
     }
 
     public function test_plain_http_is_refused()
     {
         Http::fake();
 
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'http://xolution.test/logo.png'])
-            ->assertSessionHasErrors('logo_url');
+        $this->save(['logo_raster_url' => 'http://xolution.test/logo.png'])
+            ->assertSessionHasErrors('logo_raster_url');
 
         Http::assertNothingSent();
     }
@@ -261,13 +289,8 @@ class LogoTest extends TestCase
     {
         Http::fake();
 
-        $user = User::factory()->create();
-
-        foreach (['https://169.254.169.254/latest/meta-data/', 'https://127.0.0.1/logo.png', 'https://10.0.0.5/logo.png'] as $url) {
-            $this->actingAs($user)
-                ->from(route('app-settings.edit'))
-                ->put(route('app-settings.logo.store'), ['logo_url' => $url])
-                ->assertSessionHasErrors('logo_url');
+        foreach (['https://169.254.169.254/meta', 'https://127.0.0.1/logo.png', 'https://10.0.0.5/logo.png'] as $url) {
+            $this->save(['logo_raster_url' => $url])->assertSessionHasErrors('logo_raster_url');
         }
 
         Http::assertNothingSent();
@@ -283,10 +306,8 @@ class LogoTest extends TestCase
 
         $this->resolveTestHostsTo('127.0.0.1');
 
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
-            ->assertSessionHasErrors('logo_url');
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png'])
+            ->assertSessionHasErrors('logo_raster_url');
 
         Http::assertNothingSent();
     }
@@ -300,54 +321,83 @@ class LogoTest extends TestCase
     {
         Http::fake(['xolution.test/*' => Http::response('', 302, ['Location' => 'https://elsewhere.test/logo.png'])]);
 
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
-            // The wording, not just the presence of an error. A redirect with
-            // no content type is refused as "not an image" whether or not
-            // anything looks at redirects, so only the message distinguishes
-            // the check that is actually meant to catch this from an accident.
-            ->assertSessionHasErrors(['logo_url' => 'That address redirects somewhere else. Paste the address it ends up at.']);
+        $this->save(['logo_raster_url' => 'https://xolution.test/logo.png'])
+            ->assertSessionHasErrors(['logo_raster_url' => 'That address redirects somewhere else. Paste the address it ends up at.']);
 
-        $this->assertFalse(AppSettings::current()->hasLogo());
-    }
-
-    public function test_saving_with_no_address_says_so()
-    {
-        $this->actingAs(User::factory()->create())
-            ->from(route('app-settings.edit'))
-            ->put(route('app-settings.logo.store'), [])
-            ->assertSessionHasErrors('logo_url');
+        $this->assertFalse(AppSettings::current()->hasEmailLogo());
     }
 
     /**
      * This model records its own changes, and a payload people browse is no
-     * place for fifty kilobytes of base64.
+     * place for kilobytes of base64.
      */
     public function test_the_bytes_never_reach_the_audit_log()
     {
-        $this->storeALogo();
+        $this->fakeBothKinds();
+
+        $this->save([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+        ]);
 
         foreach (AuditLogEntry::all() as $entry) {
-            $this->assertStringNotContainsString(
-                base64_encode(self::PNG),
-                (string) json_encode($entry->payload),
-            );
+            $payload = (string) json_encode($entry->payload);
+
+            $this->assertStringNotContainsString(base64_encode(self::SVG), $payload);
+            $this->assertStringNotContainsString('logo_vector_data', $payload);
+            $this->assertStringNotContainsString('logo_raster_data', $payload);
         }
     }
 
-    public function test_a_guest_cannot_change_the_logo()
+    public function test_a_guest_cannot_change_the_logos()
     {
         $this->put(route('app-settings.logo.store'))->assertRedirect(route('login'));
-        $this->delete(route('app-settings.logo.destroy'))->assertRedirect(route('login'));
     }
 
-    private function storeALogo(): void
+    /**
+     * @param  array<string, string>  $fields
+     */
+    private function save(array $fields): TestResponse
     {
-        Http::fake(['xolution.test/*' => Http::response(self::PNG, 200, ['Content-Type' => 'image/png'])]);
+        return $this->actingAs(User::factory()->create())
+            ->from(route('app-settings.edit'))
+            ->put(route('app-settings.logo.store'), $fields);
+    }
 
-        $this->actingAs(User::factory()->create())
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
-            ->assertSessionHasNoErrors();
+    /**
+     * Answers a .svg address with an SVG and anything else with a PNG, so one
+     * fake covers both fields.
+     */
+    private function fakeBothKinds(): void
+    {
+        $png = $this->png(600, 180);
+
+        Http::fake(fn ($request) => str_ends_with($request->url(), '.svg')
+            ? Http::response(self::SVG, 200, ['Content-Type' => 'image/svg+xml'])
+            : Http::response($png, 200, ['Content-Type' => 'image/png']));
+    }
+
+    /** A real PNG, so the width check has something true to measure. */
+    private function png(int $width, int $height): string
+    {
+        $image = imagecreatetruecolor($width, $height);
+
+        ob_start();
+        imagepng($image);
+
+        return (string) ob_get_clean();
+    }
+
+    private function resolveTestHostsTo(string $address): void
+    {
+        $this->swap(HostResolver::class, new class($address) extends HostResolver
+        {
+            public function __construct(private readonly string $address) {}
+
+            public function resolve(string $host): array
+            {
+                return [$this->address];
+            }
+        });
     }
 }

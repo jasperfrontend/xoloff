@@ -42,10 +42,22 @@ class LogoUnavailable extends RuntimeException
         return new self(__('That address answered with an error (:status).', ['status' => $status]));
     }
 
-    public static function notAnImage(string $type): self
+    /**
+     * Each field takes one kind, so the message names the kind rather than
+     * saying "not an image" at someone who pasted a perfectly good image into
+     * the wrong box.
+     *
+     * @param  list<string>  $accepting
+     */
+    public static function wrongKind(string $type, array $accepting): self
     {
-        return new self(__('That address returned :type rather than an image. PNG, JPG, WebP and SVG all work.', [
+        $wanted = $accepting === ['image/svg+xml']
+            ? __('an SVG')
+            : __('a PNG, JPG or WebP');
+
+        return new self(__('That address returned :type, and this field takes :wanted.', [
             'type' => $type === '' ? __('no content type') : $type,
+            'wanted' => $wanted,
         ]));
     }
 

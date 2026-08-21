@@ -162,7 +162,7 @@ class QuotePortalController extends Controller
             'company_name' => $settings->company_name,
             // A link rather than the bytes: the browser caches it, and a page
             // carrying a data uri would send the logo again on every visit.
-            'logo_url' => $settings->hasLogo() ? route('logo.show') : null,
+            'logo_url' => $settings->hasWebLogo() ? route('logo.show') : null,
         ];
     }
 }

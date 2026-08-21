@@ -7,10 +7,20 @@ namespace App\Support\Logo;
  */
 final readonly class FetchedLogo
 {
+    /**
+     * @param  int|null  $width  pixels, for a raster. An SVG has no pixel width,
+     *                           which is the whole reason it scales.
+     */
     public function __construct(
         public string $mime,
         public string $bytes,
+        public ?int $width = null,
     ) {}
+
+    public function isVector(): bool
+    {
+        return $this->mime === 'image/svg+xml';
+    }
 
     /**
      * The form the quote template needs.

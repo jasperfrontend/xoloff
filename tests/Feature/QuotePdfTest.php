@@ -318,9 +318,9 @@ class QuotePdfTest extends TestCase
         Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
 
         AppSettings::current()->update([
-            'logo_url' => 'https://xolution.test/logo.png',
-            'logo_mime' => 'image/png',
-            'logo_data' => base64_encode('bytes'),
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_vector_mime' => 'image/svg+xml',
+            'logo_vector_data' => base64_encode('bytes'),
         ]);
 
         $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
@@ -328,13 +328,13 @@ class QuotePdfTest extends TestCase
         Http::assertSent(function (Request $request): bool {
             $body = $request->body();
 
-            return str_contains($body, 'src="data:image/png;base64,'.base64_encode('bytes'))
+            return str_contains($body, 'src="data:image/svg+xml;base64,'.base64_encode('bytes'))
                 // Neither a link back to this application, which Gotenberg
                 // cannot rely on reaching, nor the address the logo came from,
                 // which would put someone else's web server in the path of
                 // printing a quote.
                 && ! str_contains($body, 'src="/storage/')
-                && ! str_contains($body, 'https://xolution.test/logo.png');
+                && ! str_contains($body, 'https://xolution.test/logo.svg');
         });
     }
 
@@ -342,7 +342,7 @@ class QuotePdfTest extends TestCase
     {
         Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
 
-        $this->assertFalse(AppSettings::current()->hasLogo());
+        $this->assertFalse(AppSettings::current()->hasWebLogo());
 
         $this->actingAs(User::factory()->create())
             ->get(route('quotes.pdf', $this->quote()))

@@ -295,7 +295,7 @@ class AuditLogTest extends TestCase
         AuditLogEntry::query()->delete();
 
         $this->actingAs(User::factory()->create())
-            ->put(route('app-settings.logo.store'), ['logo_url' => 'https://xolution.test/logo.png'])
+            ->put(route('app-settings.logo.store'), ['logo_raster_url' => 'https://xolution.test/logo.png'])
             ->assertSessionHasNoErrors();
 
         $entry = AuditLogEntry::sole();
@@ -304,8 +304,8 @@ class AuditLogTest extends TestCase
         $this->assertSame('Application settings', $entry->payload['label']);
         // The address is worth reading in a log. Fifty kilobytes of base64
         // beside it would bury every real change around it.
-        $this->assertSame('https://xolution.test/logo.png', $entry->payload['changes']['logo_url']['to']);
-        $this->assertArrayNotHasKey('logo_data', $entry->payload['changes']);
+        $this->assertSame('https://xolution.test/logo.png', $entry->payload['changes']['logo_raster_url']['to']);
+        $this->assertArrayNotHasKey('logo_raster_data', $entry->payload['changes']);
     }
 
     /**

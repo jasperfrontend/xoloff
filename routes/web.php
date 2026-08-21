@@ -26,7 +26,11 @@ Route::redirect('/', '/dashboard')->name('home');
 // it is the same image they already publish on their own site. The PDF does
 // not come through here - it embeds the bytes, since Gotenberg renders
 // elsewhere and cannot necessarily reach this application.
-Route::get('logo', LogoController::class)->name('logo.show');
+Route::get('logo', [LogoController::class, 'show'])->name('logo.show');
+
+// The raster, for email. Gmail strips an SVG and Outlook will not draw one,
+// so a message needs this one or no image at all.
+Route::get('logo/email', [LogoController::class, 'email'])->name('logo.email');
 
 // The magic link, and the only page in xoloff a customer ever reaches (SPEC
 // §7). Public by design: the token in the address is the whole credential,
@@ -111,10 +115,10 @@ Route::middleware(['auth'])->group(function () {
     // the chosen file whenever anything else on the screen failed validation.
     Route::get('app-settings', [AppSettingsController::class, 'edit'])->name('app-settings.edit');
     Route::put('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
+    // Both addresses save together. Clearing one removes that logo, so there
+    // is no separate delete to keep in step with this.
     Route::put('app-settings/logo', [AppSettingsController::class, 'storeLogo'])
         ->name('app-settings.logo.store');
-    Route::delete('app-settings/logo', [AppSettingsController::class, 'destroyLogo'])
-        ->name('app-settings.logo.destroy');
 });
 
 require __DIR__.'/settings.php';

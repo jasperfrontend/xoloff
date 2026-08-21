@@ -19,7 +19,17 @@
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
     <tr>
         <td style="padding: 32px;">
-            @if (filled($sender))
+            {{-- A linked image, not embedded bytes: a data uri is stripped by
+                 most mail clients and an attachment shows up as a paperclip.
+                 Height only, with width left to follow, for the same reason
+                 the other templates do it - and the alt text carries the name
+                 for the many people who read mail with images turned off. --}}
+            @if ($logoUrl !== null)
+                <img src="{{ $logoUrl }}"
+                     alt="{{ $sender ?? '' }}"
+                     height="40"
+                     style="display: block; height: 40px; width: auto; max-width: 240px; border: 0; margin: 0 0 24px;">
+            @elseif (filled($sender))
                 <p style="margin: 0 0 24px; font-weight: bold;">{{ $sender }}</p>
             @endif
 

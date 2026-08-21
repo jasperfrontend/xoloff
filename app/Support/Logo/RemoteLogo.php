@@ -21,7 +21,7 @@ class RemoteLogo
     private const MAX_KILOBYTES = 2048;
 
     /**
-     * SVG is here although the upload it replaces refused it.
+     * SVG is accepted although the upload this replaced refused it.
      *
      * An uploaded SVG was a real risk: it is a document that can carry script,
      * and it was going to be rendered by a Chromium. This one only ever
@@ -31,19 +31,24 @@ class RemoteLogo
      *
      * @var list<string>
      */
-    private const IMAGE_TYPES = [
-        'image/png',
-        'image/jpeg',
-        'image/webp',
-        'image/svg+xml',
-    ];
+    public const VECTOR_TYPES = ['image/svg+xml'];
+
+    /**
+     * What email can actually draw. Gmail strips an SVG and Outlook will not
+     * render one, so the message needs a raster or it needs no image at all.
+     *
+     * @var list<string>
+     */
+    public const RASTER_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
     public function __construct(private readonly HostResolver $resolver) {}
 
     /**
+     * @param  list<string>  $accepting  the types this particular field takes
+     *
      * @throws LogoUnavailable
      */
-    public function fetch(string $url): FetchedLogo
+    public function fetch(string $url, array $accepting): FetchedLogo
     {
         $this->refuseAnythingButAPublicHttpsAddress($url);
 
@@ -70,8 +75,10 @@ class RemoteLogo
         // Only the type itself: a header may carry "image/svg+xml; charset=utf-8".
         $mime = trim(explode(';', $response->header('Content-Type'))[0]);
 
-        if (! in_array(strtolower($mime), self::IMAGE_TYPES, true)) {
-            throw LogoUnavailable::notAnImage($mime);
+        $mime = strtolower($mime);
+
+        if (! in_array($mime, $accepting, true)) {
+            throw LogoUnavailable::wrongKind($mime, $accepting);
         }
 
         $bytes = $response->body();
@@ -80,7 +87,22 @@ class RemoteLogo
             throw LogoUnavailable::tooLarge(self::MAX_KILOBYTES);
         }
 
-        return new FetchedLogo(strtolower($mime), $bytes);
+        return new FetchedLogo($mime, $bytes, $this->widthOf($mime, $bytes));
+    }
+
+    /**
+     * How wide a raster is, so the screen can say when one is too small to
+     * look sharp. An SVG has no pixel width, which is the point of it.
+     */
+    private function widthOf(string $mime, string $bytes): ?int
+    {
+        if (in_array($mime, self::VECTOR_TYPES, true)) {
+            return null;
+        }
+
+        $size = @getimagesizefromstring($bytes);
+
+        return is_array($size) ? $size[0] : null;
     }
 
     /**

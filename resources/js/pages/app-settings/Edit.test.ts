@@ -1,6 +1,5 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import AppSettingsEdit from '@/pages/app-settings/Edit.vue';
 import { resetInertiaStub, submissions } from '@/test-support/inertia';
 
@@ -11,8 +10,10 @@ vi.mock('@inertiajs/vue3', async () =>
 type Settings = InstanceType<typeof AppSettingsEdit>['$props']['settings'];
 
 const blank: Settings = {
-    logo_url: null,
-    logo_preview_url: null,
+    logo_vector_url: null,
+    logo_raster_url: null,
+    logo_vector_preview_url: null,
+    logo_raster_preview_url: null,
     company_name: null,
     company_address: null,
     company_kvk: null,
@@ -27,8 +28,10 @@ function build(settings: Partial<Settings> = {}) {
 }
 
 const saved = {
-    logo_url: 'https://xolution.nl/wp-content/uploads/logo.svg',
-    logo_preview_url: '/logo',
+    logo_vector_url: 'https://xolution.nl/wp-content/uploads/logo.svg',
+    logo_raster_url: 'https://xolution.nl/wp-content/uploads/logo-600w.png',
+    logo_vector_preview_url: '/logo',
+    logo_raster_preview_url: '/logo/email',
 };
 
 const details = {
@@ -43,56 +46,76 @@ describe('app-settings/Edit', () => {
         resetInertiaStub();
     });
 
-    it('says so when no logo has been saved', () => {
+    it('says so when neither logo has been saved', () => {
         const wrapper = build();
 
-        expect(wrapper.text()).toContain('No logo saved yet');
+        expect(wrapper.text()).toContain('Not set');
         expect(wrapper.find('img').exists()).toBe(false);
     });
 
     /**
-     * The stored copy, not the address it came from. Previewing the remote
-     * image would show what is out there rather than what this application
-     * actually holds, which is the one thing this screen is for.
+     * The stored copies, not the addresses they came from. Previewing the
+     * remote images would show what is out there rather than what this
+     * application actually holds, which is the one thing this screen is for.
      */
-    it('previews the stored copy rather than the remote address', () => {
+    it('previews the stored copies rather than the remote addresses', () => {
+        const sources = build(saved)
+            .findAll('img')
+            .map((image) => image.attributes('src'));
+
+        expect(sources).toEqual(['/logo', '/logo/email']);
+    });
+
+    /**
+     * Two fields for one logo can drift apart, and one of them lives only in
+     * email where nobody looks critically. Showing both is what makes a
+     * mismatch visible.
+     */
+    it('shows both previews side by side, even when only one is set', () => {
+        const wrapper = build({
+            logo_vector_url: 'https://xolution.nl/logo.svg',
+            logo_vector_preview_url: '/logo',
+        });
+
+        expect(wrapper.findAll('img')).toHaveLength(1);
+        expect(wrapper.text()).toContain('Not set');
+    });
+
+    it('keeps both addresses in their fields so a typo can be corrected', () => {
         const wrapper = build(saved);
 
-        expect(wrapper.find('img').attributes('src')).toBe('/logo');
-        expect(wrapper.text()).not.toContain('No logo saved yet');
-    });
+        const valueOf = (name: string) =>
+            (wrapper.find(`input[name="${name}"]`).element as HTMLInputElement)
+                .value;
 
-    it('keeps the address in the field so a typo can be corrected', () => {
-        const input = build(saved).find('input[name="logo_url"]');
-
-        expect((input.element as HTMLInputElement).value).toBe(
+        expect(valueOf('logo_vector_url')).toBe(
             'https://xolution.nl/wp-content/uploads/logo.svg',
         );
-        expect(input.attributes('type')).toBe('url');
-    });
-
-    it('offers to fetch again rather than to save once there is a logo', () => {
-        expect(build().text()).toContain('Save logo');
-        expect(build(saved).text()).toContain('Fetch again');
-    });
-
-    it('offers removal only when there is something to remove', () => {
-        expect(build().find('button[aria-label="Remove logo"]').exists()).toBe(
-            false,
+        expect(valueOf('logo_raster_url')).toBe(
+            'https://xolution.nl/wp-content/uploads/logo-600w.png',
         );
-        expect(
-            build(saved).find('button[aria-label="Remove logo"]').exists(),
-        ).toBe(true);
     });
 
-    // The wording lives in the confirmation dialog, which only renders once
-    // the dialog is opened, so it is read off the prop that carries it.
-    it('promises that a downloaded quote keeps the logo it was printed with', () => {
-        const description = build(saved)
-            .findComponent(ConfirmDeleteButton)
-            .props('description');
+    /**
+     * Either alone is enough, so neither field can be required - and clearing
+     * one is how that logo is removed.
+     */
+    it('demands neither address', () => {
+        const wrapper = build();
 
-        expect(description).toContain('keep the logo they were printed with');
+        for (const name of ['logo_vector_url', 'logo_raster_url']) {
+            expect(
+                wrapper.find(`input[name="${name}"]`).attributes('required'),
+            ).toBeUndefined();
+        }
+    });
+
+    it('says why there are two and what each is for', () => {
+        const text = build().text();
+
+        expect(text).toContain('quote page and the PDF');
+        expect(text).toContain('cannot draw an SVG');
+        expect(text).toContain('300 pixels wide');
     });
 
     /**
@@ -172,7 +195,9 @@ describe('app-settings/Edit', () => {
         it('saves separately from the logo', () => {
             const logoForm = build()
                 .findAll('form')
-                .find((form) => form.find('input[name="logo_url"]').exists());
+                .find((form) =>
+                    form.find('input[name="logo_vector_url"]').exists(),
+                );
 
             expect(logoForm).toBeDefined();
             expect(logoForm!.find('input[name="company_name"]').exists()).toBe(

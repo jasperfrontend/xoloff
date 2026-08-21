@@ -11,9 +11,12 @@ use Illuminate\Database\Eloquent\Model;
  * The single row of application-wide configuration (SPEC §3).
  *
  * @property int $id
- * @property string|null $logo_url
- * @property string|null $logo_mime
- * @property string|null $logo_data
+ * @property string|null $logo_vector_url
+ * @property string|null $logo_vector_mime
+ * @property string|null $logo_vector_data
+ * @property string|null $logo_raster_url
+ * @property string|null $logo_raster_mime
+ * @property string|null $logo_raster_data
  * @property string|null $company_name
  * @property string|null $company_address
  * @property string|null $company_kvk
@@ -27,9 +30,12 @@ class AppSettings extends Model implements DescribesItselfForAudit
     protected $table = 'app_settings';
 
     protected $fillable = [
-        'logo_url',
-        'logo_mime',
-        'logo_data',
+        'logo_vector_url',
+        'logo_vector_mime',
+        'logo_vector_data',
+        'logo_raster_url',
+        'logo_raster_mime',
+        'logo_raster_data',
         'company_name',
         'company_address',
         'company_kvk',
@@ -63,31 +69,39 @@ class AppSettings extends Model implements DescribesItselfForAudit
      */
     protected function auditExcept(): array
     {
-        return ['logo_data'];
+        return ['logo_vector_data', 'logo_raster_data'];
     }
 
     /**
-     * Whether there is a logo to print. The address alone is not enough: it is
-     * the bytes fetched from it that reach a quote.
+     * The logo for a screen or for print: the vector if there is one, and the
+     * raster otherwise. Either on its own is enough.
      */
-    public function hasLogo(): bool
+    public function webLogo(): ?FetchedLogo
     {
-        return $this->logo_data !== null && $this->logo_mime !== null;
+        return $this->logo('vector') ?? $this->logo('raster');
     }
 
     /**
-     * The stored logo, or null if none has been fetched.
+     * The logo for an email, which can only be the raster.
+     *
+     * Gmail strips an SVG and Outlook will not draw one, so falling back to
+     * the vector here would mean sending a broken image rather than none - and
+     * a broken image is worse, because it leaves a placeholder box where a
+     * missing one leaves nothing.
      */
-    public function logo(): ?FetchedLogo
+    public function emailLogo(): ?FetchedLogo
     {
-        if (! $this->hasLogo()) {
-            return null;
-        }
+        return $this->logo('raster');
+    }
 
-        return new FetchedLogo(
-            (string) $this->logo_mime,
-            (string) base64_decode((string) $this->logo_data, strict: true),
-        );
+    public function hasWebLogo(): bool
+    {
+        return $this->webLogo() !== null;
+    }
+
+    public function hasEmailLogo(): bool
+    {
+        return $this->emailLogo() !== null;
     }
 
     /**
@@ -98,18 +112,41 @@ class AppSettings extends Model implements DescribesItselfForAudit
      * response body for the browser - so encoding once on the way in beats
      * decoding a stream on the way out of every read.
      */
-    public function storeLogo(FetchedLogo $logo, string $url): void
+    public function storeLogo(string $side, FetchedLogo $logo, string $url): void
     {
         $this->update([
-            'logo_url' => $url,
-            'logo_mime' => $logo->mime,
-            'logo_data' => base64_encode($logo->bytes),
+            "logo_{$side}_url" => $url,
+            "logo_{$side}_mime" => $logo->mime,
+            "logo_{$side}_data" => base64_encode($logo->bytes),
         ]);
     }
 
-    public function forgetLogo(): void
+    /**
+     * Clearing the address is how a logo is removed, so there is no separate
+     * delete to keep in step with the save.
+     */
+    public function forgetLogo(string $side): void
     {
-        $this->update(['logo_url' => null, 'logo_mime' => null, 'logo_data' => null]);
+        $this->update([
+            "logo_{$side}_url" => null,
+            "logo_{$side}_mime" => null,
+            "logo_{$side}_data" => null,
+        ]);
+    }
+
+    /**
+     * @param  'vector'|'raster'  $side
+     */
+    private function logo(string $side): ?FetchedLogo
+    {
+        $mime = $this->{"logo_{$side}_mime"};
+        $data = $this->{"logo_{$side}_data"};
+
+        if ($mime === null || $data === null) {
+            return null;
+        }
+
+        return new FetchedLogo($mime, (string) base64_decode((string) $data, strict: true));
     }
 
     /**

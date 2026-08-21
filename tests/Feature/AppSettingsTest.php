@@ -19,7 +19,7 @@ class AppSettingsTest extends TestCase
     public function test_the_single_row_exists_from_the_start()
     {
         $this->assertDatabaseCount('app_settings', 1);
-        $this->assertNull(AppSettings::current()->logo_url);
+        $this->assertNull(AppSettings::current()->logo_vector_url);
     }
 
     public function test_the_screen_opens_before_anything_has_been_filled_in()
@@ -29,8 +29,10 @@ class AppSettingsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('app-settings/Edit')
-                ->where('settings.logo_url', null)
-                ->where('settings.logo_preview_url', null)
+                ->where('settings.logo_vector_url', null)
+                ->where('settings.logo_raster_url', null)
+                ->where('settings.logo_vector_preview_url', null)
+                ->where('settings.logo_raster_preview_url', null)
                 ->where('settings.company_name', null)
                 ->where('settings.company_address', null)
                 ->where('settings.company_kvk', null)
@@ -112,9 +114,9 @@ class AppSettingsTest extends TestCase
     public function test_saving_the_details_leaves_the_logo_alone()
     {
         AppSettings::current()->update([
-            'logo_url' => 'https://xolution.test/logo.png',
-            'logo_mime' => 'image/png',
-            'logo_data' => base64_encode('bytes'),
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+            'logo_raster_mime' => 'image/png',
+            'logo_raster_data' => base64_encode('bytes'),
         ]);
 
         $this->actingAs(User::factory()->create())
@@ -123,8 +125,8 @@ class AppSettingsTest extends TestCase
         $settings = AppSettings::current();
 
         $this->assertSame('Xolution', $settings->company_name);
-        $this->assertSame('https://xolution.test/logo.png', $settings->logo_url);
-        $this->assertTrue($settings->hasLogo());
+        $this->assertSame('https://xolution.test/logo.png', $settings->logo_raster_url);
+        $this->assertTrue($settings->hasWebLogo());
     }
 
     public function test_a_guest_cannot_reach_any_of_it()
@@ -132,6 +134,5 @@ class AppSettingsTest extends TestCase
         $this->get(route('app-settings.edit'))->assertRedirect(route('login'));
         $this->put(route('app-settings.update'))->assertRedirect(route('login'));
         $this->put(route('app-settings.logo.store'))->assertRedirect(route('login'));
-        $this->delete(route('app-settings.logo.destroy'))->assertRedirect(route('login'));
     }
 }

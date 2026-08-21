@@ -86,7 +86,7 @@ class ValidationMessagesTest extends TestCase
             'quote texts' => ['put', 'premade-texts.update', [
                 'footer' => '',
             ]],
-            'app settings logo' => ['put', 'app-settings.logo.store', ['logo_url' => 'not an address']],
+            'app settings logo' => ['put', 'app-settings.logo.store', ['logo_vector_url' => 'not an address', 'logo_raster_url' => 'nor this']],
             'app settings' => ['put', 'app-settings.update', [
                 'company_name' => str_repeat('a', 256),
                 'company_address' => str_repeat('a', 501),

@@ -95,7 +95,7 @@ final class RenderQuotePdf
      */
     private function logo(AppSettings $settings): ?string
     {
-        return $settings->logo()?->toDataUri();
+        return $settings->webLogo()?->toDataUri();
     }
 
     private function filename(Quote $quote, QuoteVersion $version): string

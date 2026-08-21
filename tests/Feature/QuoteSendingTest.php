@@ -333,6 +333,58 @@ class QuoteSendingTest extends TestCase
     }
 
     /**
+     * Email clients mostly will not draw an SVG, so the message links the
+     * raster. A linked image rather than embedded bytes: a data uri is
+     * stripped by most clients and an attachment shows as a paperclip.
+     */
+    public function test_the_message_links_the_raster_logo()
+    {
+        AppSettings::current()->update([
+            'logo_raster_url' => 'https://xolution.test/logo.png',
+            'logo_raster_mime' => 'image/png',
+            'logo_raster_data' => base64_encode('bytes'),
+            'company_name' => 'Xolution',
+        ]);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        Mail::assertSent(QuoteSent::class, function (QuoteSent $mail): bool {
+            $rendered = $mail->render();
+
+            return str_contains($rendered, 'src="'.route('logo.email').'"')
+                // The name survives as alt text, for the many people who read
+                // mail with images turned off.
+                && str_contains($rendered, 'alt="Xolution"');
+        });
+    }
+
+    /**
+     * A vector alone leaves the message with no image rather than a broken
+     * one, and a broken image is worse: it leaves a placeholder box where a
+     * missing one leaves nothing.
+     */
+    public function test_the_message_falls_back_to_the_name_with_no_raster()
+    {
+        AppSettings::current()->update([
+            'logo_vector_url' => 'https://xolution.test/logo.svg',
+            'logo_vector_mime' => 'image/svg+xml',
+            'logo_vector_data' => base64_encode('bytes'),
+            'company_name' => 'Xolution',
+        ]);
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $this->quote()));
+
+        Mail::assertSent(QuoteSent::class, function (QuoteSent $mail): bool {
+            $rendered = $mail->render();
+
+            return ! str_contains($rendered, '<img')
+                && str_contains($rendered, 'Xolution');
+        });
+    }
+
+    /**
      * The inbox should show the company, not the tool that produced this.
      */
     public function test_the_message_comes_from_the_company_rather_than_the_app()

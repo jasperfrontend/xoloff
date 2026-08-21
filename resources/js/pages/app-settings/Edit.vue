@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
 import { ImageOff } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AppSettingsController from '@/actions/App/Http/Controllers/AppSettingsController';
-import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -13,8 +12,10 @@ import { edit } from '@/routes/app-settings';
 
 const props = defineProps<{
     settings: {
-        logo_url: string | null;
-        logo_preview_url: string | null;
+        logo_vector_url: string | null;
+        logo_raster_url: string | null;
+        logo_vector_preview_url: string | null;
+        logo_raster_preview_url: string | null;
         company_name: string | null;
         company_address: string | null;
         company_kvk: string | null;
@@ -30,6 +31,17 @@ defineOptions({
 });
 
 const companyAddress = ref(props.settings.company_address ?? '');
+
+const previews = computed(() => [
+    {
+        label: 'SVG, for the quote page and PDF',
+        url: props.settings.logo_vector_preview_url,
+    },
+    {
+        label: 'PNG or JPG, for email',
+        url: props.settings.logo_raster_preview_url,
+    },
+]);
 </script>
 
 <template>
@@ -151,81 +163,100 @@ const companyAddress = ref(props.settings.company_address ?? '');
         </div>
 
         <div class="grid max-w-lg gap-4 rounded-xl border p-4">
-            <div class="flex items-start justify-between gap-4">
-                <div>
-                    <h2 class="font-medium">Logo</h2>
-                    <p class="text-sm text-foreground">
-                        Printed at the top of every quote PDF, and shown to the
-                        customer on their quote page.
-                    </p>
-                </div>
-
-                <ConfirmDeleteButton
-                    v-if="settings.logo_preview_url"
-                    :action="AppSettingsController.destroyLogo.form()"
-                    title="Remove the logo?"
-                    description="Quotes will print without one until another address is saved. Quotes already downloaded keep the logo they were printed with."
-                    label="Remove logo"
-                />
+            <div>
+                <h2 class="font-medium">Logo</h2>
+                <p class="text-sm text-foreground">
+                    Two addresses, because no one file works everywhere. The SVG
+                    goes on the quote page and the PDF; email clients mostly
+                    refuse to draw an SVG, so email uses the PNG. Either on its
+                    own is enough.
+                </p>
             </div>
 
             <!--
-                The stored copy, not the address it came from. Showing the
-                remote image would prove that something is out there rather
-                than that this application actually holds it, which is the one
-                thing worth seeing here.
+                The stored copies, not the addresses they came from. Previewing
+                the remote images would show what is out there rather than what
+                this application actually holds. Side by side on purpose: two
+                fields for one logo can drift apart, and seeing both is what
+                makes that obvious.
             -->
-            <div
-                class="flex h-32 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-4"
-            >
-                <img
-                    v-if="settings.logo_preview_url"
-                    :src="settings.logo_preview_url"
-                    alt="The logo printed on quotes"
-                    class="h-24 w-auto max-w-full object-contain"
-                />
-                <p
-                    v-else
-                    class="flex items-center gap-2 text-sm text-foreground"
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div
+                    v-for="preview in previews"
+                    :key="preview.label"
+                    class="grid gap-1"
                 >
-                    <ImageOff class="size-4" />
-                    No logo saved yet
-                </p>
+                    <span class="text-xs text-muted-foreground">
+                        {{ preview.label }}
+                    </span>
+                    <div
+                        class="flex h-24 items-center justify-center rounded-lg border border-dashed bg-muted/30 p-3"
+                    >
+                        <img
+                            v-if="preview.url"
+                            :src="preview.url"
+                            :alt="preview.label"
+                            class="h-16 w-auto max-w-full object-contain"
+                        />
+                        <p
+                            v-else
+                            class="flex items-center gap-2 text-center text-xs text-foreground"
+                        >
+                            <ImageOff class="size-4 shrink-0" />
+                            Not set
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <Form
                 v-bind="AppSettingsController.storeLogo.form()"
-                class="grid gap-3"
+                class="grid gap-4"
                 v-slot="{ errors, processing }"
             >
                 <div class="grid gap-2">
-                    <Label for="logo_url">Logo address</Label>
+                    <Label for="logo_vector_url">SVG address</Label>
                     <Input
-                        id="logo_url"
-                        name="logo_url"
+                        id="logo_vector_url"
+                        name="logo_vector_url"
                         type="url"
                         inputmode="url"
                         placeholder="https://xolution.nl/wp-content/uploads/logo.svg"
-                        :default-value="settings.logo_url ?? ''"
-                        required
+                        :default-value="settings.logo_vector_url ?? ''"
                     />
                     <p class="text-xs text-foreground">
-                        Fetched and stored once, now, so printing a quote never
-                        depends on that address still answering. PNG, JPG, WebP
-                        or SVG. Change the file at that address and press save
-                        again to pick it up.
+                        Used on the quote page and in the PDF, where it stays
+                        sharp at any size.
                     </p>
-                    <InputError :message="errors.logo_url" />
+                    <InputError :message="errors.logo_vector_url" />
                 </div>
 
+                <div class="grid gap-2">
+                    <Label for="logo_raster_url">PNG or JPG address</Label>
+                    <Input
+                        id="logo_raster_url"
+                        name="logo_raster_url"
+                        type="url"
+                        inputmode="url"
+                        placeholder="https://xolution.nl/wp-content/uploads/logo-600w.png"
+                        :default-value="settings.logo_raster_url ?? ''"
+                    />
+                    <p class="text-xs text-foreground">
+                        Used in quote emails, which cannot draw an SVG. At least
+                        300 pixels wide, or it looks soft on a good screen.
+                    </p>
+                    <InputError :message="errors.logo_raster_url" />
+                </div>
+
+                <p class="text-xs text-foreground">
+                    Both are fetched and stored now, so printing or sending a
+                    quote never depends on those addresses still answering.
+                    Change a file at its address and save again to pick it up,
+                    or clear a field to remove that logo.
+                </p>
+
                 <div>
-                    <Button :disabled="processing">
-                        {{
-                            settings.logo_preview_url
-                                ? 'Fetch again'
-                                : 'Save logo'
-                        }}
-                    </Button>
+                    <Button :disabled="processing">Save logos</Button>
                 </div>
             </Form>
         </div>

@@ -61,6 +61,12 @@ class QuoteSent extends Mailable
             with: [
                 'link' => route('portal.quote', $this->quote->magic_link_token),
                 'sender' => $this->settings->company_name,
+                // An absolute address rather than embedded bytes. A data uri
+                // is stripped by most mail clients, and an attached image
+                // shows up as a paperclip; a plain https link is the one form
+                // they agree on. Null when no raster has been given, and the
+                // message then falls back to the company name in text.
+                'logoUrl' => $this->settings->hasEmailLogo() ? route('logo.email') : null,
                 'contact' => $this->quote->customer->contact_person,
                 'validUntil' => $this->quote->valid_until,
             ],
