@@ -2,19 +2,27 @@
 
 namespace App\Actions\Quotes;
 
+use App\Enums\AuditAction;
 use App\Enums\QuoteStatus;
+use App\Mail\QuoteSent;
 use App\Models\AppSettings;
 use App\Models\Quote;
+use App\Support\Audit\AuditLog;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Issues a quote to its customer (SPEC §7): a magic link, a date it stops
- * being valid, and a status saying it is out in the world.
+ * being valid, a status saying it is out in the world, and an email carrying
+ * the link.
  *
- * Delivering it is separate. The link this produces is what an email will
- * carry, and until Xolution's SMTP credentials arrive (SPEC §12) it is what
- * gets passed on by hand.
+ * Issuing and delivering are deliberately not all-or-nothing. Once the link
+ * exists and the status has moved, the quote has been sent - a mail server
+ * that refused the message is a delivery problem, and rolling the send back
+ * would leave a quote that says draft while its link is live.
  */
 final class SendQuote
 {
@@ -28,8 +36,9 @@ final class SendQuote
 
     /**
      * @param  int|null  $validityDays  how long it stays valid, or null to follow the application default
+     * @return bool whether the email reached the mail server
      */
-    public function handle(Quote $quote, ?int $validityDays = null): Quote
+    public function handle(Quote $quote, ?int $validityDays = null): bool
     {
         // Kept across a re-send rather than rotated. Both links lead to the
         // same place - the portal always shows the current version - so
@@ -56,6 +65,50 @@ final class SendQuote
             'validity_days' => $quote->validityDays(),
         ]);
 
-        return $quote;
+        return $this->deliver($quote);
+    }
+
+    /**
+     * Emails the link, and records the attempt either way.
+     *
+     * SPEC §2 asks for every send to be logged, and a failure is the case that
+     * most needs it: whoever pressed Send has to know the customer does not
+     * have the message, and later has to be able to see when that happened.
+     * The exception is caught rather than left to bubble, because the quote
+     * really was sent - what failed is only the carrying of it.
+     */
+    private function deliver(Quote $quote): bool
+    {
+        $quote->loadMissing('customer');
+
+        try {
+            Mail::to($quote->customer->email)
+                ->send(new QuoteSent($quote, AppSettings::current()));
+        } catch (Throwable $exception) {
+            // The message text goes to the application log rather than the
+            // audit log: it is a mail server's wording, occasionally with a
+            // host or a credential in it, and the audit log is browsed.
+            Log::error('Sending quote '.$quote->getKey().' failed.', ['exception' => $exception]);
+
+            $this->record($quote, delivered: false);
+
+            return false;
+        }
+
+        $this->record($quote, delivered: true);
+
+        return true;
+    }
+
+    private function record(Quote $quote, bool $delivered): void
+    {
+        AuditLog::record($quote, AuditAction::NotificationSent, [
+            ...$quote->auditContext(),
+            'attributes' => [
+                'channel' => 'email',
+                'recipient' => $quote->customer->email,
+                'delivered' => $delivered,
+            ],
+        ]);
     }
 }

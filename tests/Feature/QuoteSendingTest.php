@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\AuditAction;
 use App\Enums\QuoteStatus;
+use App\Mail\QuoteSent;
 use App\Models\AppSettings;
 use App\Models\AuditLogEntry;
 use App\Models\Customer;
@@ -11,6 +12,8 @@ use App\Models\Quote;
 use App\Models\QuoteVersion;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -19,6 +22,13 @@ use Tests\TestCase;
 class QuoteSendingTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Mail::fake();
+    }
 
     public function test_sending_issues_a_link_and_marks_the_quote_sent()
     {
@@ -187,9 +197,12 @@ class QuoteSendingTest extends TestCase
         $this->actingAs($user = User::factory()->create())
             ->post(route('quotes.send', $quote), ['validity_days' => 14]);
 
-        $entry = AuditLogEntry::sole();
+        // Exactly two: the status moving, and the message going out. Not a
+        // third naming the columns sending wrote.
+        $this->assertDatabaseCount('audit_log', 2);
 
-        $this->assertSame(AuditAction::StatusChanged, $entry->action);
+        $entry = AuditLogEntry::query()->where('action', AuditAction::StatusChanged)->sole();
+
         $this->assertSame('quote', $entry->entity_type);
         $this->assertSame($quote->id, $entry->payload['quote_id']);
         $this->assertSame($user->id, $entry->user_id);
@@ -256,6 +269,127 @@ class QuoteSendingTest extends TestCase
                 ->where('quote.validity_days', 90)
                 ->where('quote.follows_the_default', false),
             );
+    }
+
+    public function test_the_customer_is_emailed_the_link()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        Mail::assertSent(QuoteSent::class, fn (QuoteSent $mail): bool => $mail->hasTo($quote->customer->email)
+            && $mail->quote->is($quote));
+    }
+
+    public function test_the_message_carries_the_link_and_the_expiry_in_dutch()
+    {
+        AppSettings::current()->update(['company_name' => 'Xolution']);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote), ['validity_days' => 30]);
+
+        $quote->refresh();
+
+        Mail::assertSent(QuoteSent::class, function (QuoteSent $mail) use ($quote): bool {
+            $rendered = $mail->render();
+
+            return str_contains($rendered, route('portal.quote', $quote->magic_link_token))
+                && str_contains($rendered, $quote->valid_until->format('d-m-Y'))
+                && str_contains($rendered, 'Bekijk de offerte')
+                && str_contains($rendered, $quote->customer->contact_person);
+        });
+    }
+
+    /**
+     * The inbox should show the company, not the tool that produced this.
+     */
+    public function test_the_message_comes_from_the_company_rather_than_the_app()
+    {
+        AppSettings::current()->update(['company_name' => 'Xolution']);
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        Mail::assertSent(QuoteSent::class, function (QuoteSent $mail): bool {
+            $envelope = $mail->envelope();
+
+            return $envelope->from?->name === 'Xolution'
+                && str_contains($envelope->subject, 'van Xolution');
+        });
+    }
+
+    /**
+     * SPEC §7 tracks reading by portal visit. A customer holding the document
+     * has no reason to follow the link, which would leave every quote looking
+     * unread.
+     */
+    public function test_the_pdf_is_not_attached()
+    {
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        Mail::assertSent(QuoteSent::class, fn (QuoteSent $mail): bool => $mail->attachments() === []);
+    }
+
+    public function test_every_send_is_logged_whether_or_not_it_arrived()
+    {
+        $quote = $this->quote();
+
+        AuditLogEntry::query()->delete();
+
+        $this->actingAs(User::factory()->create())->post(route('quotes.send', $quote));
+
+        $entry = AuditLogEntry::query()->where('action', AuditAction::NotificationSent)->sole();
+
+        $this->assertSame('email', $entry->payload['attributes']['channel']);
+        $this->assertSame($quote->customer->email, $entry->payload['attributes']['recipient']);
+        $this->assertTrue($entry->payload['attributes']['delivered']);
+    }
+
+    /**
+     * The link is live and the status has moved, so the quote really was sent.
+     * Rolling that back would leave a quote reading draft with a working link
+     * behind it.
+     */
+    public function test_a_refused_message_does_not_undo_the_send()
+    {
+        Mail::shouldReceive('to')->andThrow(new RuntimeException('relay refused'));
+
+        $quote = $this->quote();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote))
+            ->assertRedirect(route('quotes.edit', $quote));
+
+        $quote->refresh();
+
+        $this->assertSame(QuoteStatus::Sent, $quote->status);
+        $this->assertNotNull($quote->magic_link_token);
+    }
+
+    /**
+     * A success message here would leave someone waiting for a reply to
+     * something the customer never received.
+     */
+    public function test_a_refused_message_says_so_and_is_logged_as_undelivered()
+    {
+        Mail::shouldReceive('to')->andThrow(new RuntimeException('relay refused'));
+
+        $quote = $this->quote();
+
+        AuditLogEntry::query()->delete();
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.send', $quote))
+            ->assertSessionHasErrors('send');
+
+        $entry = AuditLogEntry::query()->where('action', AuditAction::NotificationSent)->sole();
+
+        $this->assertFalse($entry->payload['attributes']['delivered']);
     }
 
     private function quote(): Quote

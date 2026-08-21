@@ -25,9 +25,25 @@ class QuoteSendController extends Controller
             return back()->withErrors(['send' => __('This quote has no saved version to send yet.')]);
         }
 
-        $this->sendQuote->handle($quote, $request->integer('validity_days') ?: null);
+        $delivered = $this->sendQuote->handle($quote, $request->integer('validity_days') ?: null);
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Quote sent.')]);
+        // The quote is sent either way: the link is live and the status has
+        // moved. What failed is the carrying of it, and saying so beats a
+        // success message that leaves someone waiting for a reply to a message
+        // the customer never received - the link is on the screen behind this,
+        // ready to pass on by hand.
+        if (! $delivered) {
+            return to_route('quotes.edit', $quote)->withErrors([
+                'send' => __('The quote is marked as sent and its link works, but the email could not be delivered to :email. Send them the link below yourself.', [
+                    'email' => $quote->customer->email,
+                ]),
+            ]);
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Quote sent to :email.', ['email' => $quote->customer->email]),
+        ]);
 
         return to_route('quotes.edit', $quote);
     }
