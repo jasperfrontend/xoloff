@@ -8,6 +8,7 @@ use App\Models\AuditLogEntry;
 use App\Models\Customer;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -223,6 +224,26 @@ class QuoteDecisionTest extends TestCase
                 ->where('quote.can_decide', false)
                 ->where('quote.status', 'denied')
                 ->where('quote.deny_reason', 'Nee'),
+            );
+    }
+
+    /**
+     * SPEC §3: the reason is shown when the status is denied. The customer
+     * sees it read back, and so does the person who has to act on it.
+     */
+    public function test_the_quote_screen_carries_the_reason_they_gave()
+    {
+        $quote = $this->openedQuote();
+
+        $this->post(route('portal.quote.deny', $quote->magic_link_token), [
+            'reason' => 'Te duur voor dit kwartaal.',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('quote.status', 'denied')
+                ->where('quote.deny_reason', 'Te duur voor dit kwartaal.'),
             );
     }
 

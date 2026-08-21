@@ -26,6 +26,7 @@ interface Quote extends QuoteContent {
     customer_email: string;
     status: QuoteStatus;
     status_label: string;
+    deny_reason: string | null;
     sent_at: string | null;
     valid_until: string | null;
     validity_days: number;
@@ -114,6 +115,26 @@ const sendError = computed(() => page.props.errors?.send);
             class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
             {{ pdfError ?? sendError }}
+        </div>
+
+        <!--
+            A refusal is the one status that comes with something to read, so
+            it gets its own panel rather than a line in the sent block. Shown
+            even when the customer declined without explaining, because "no
+            reason given" is itself worth knowing.
+        -->
+        <div
+            v-if="quote.status === 'denied'"
+            class="grid gap-1 rounded-xl border border-destructive/50 bg-destructive/10 p-4 text-sm"
+        >
+            <span class="font-medium">The customer declined this quote</span>
+            <p
+                v-if="quote.deny_reason"
+                class="whitespace-pre-line text-foreground"
+            >
+                {{ quote.deny_reason }}
+            </p>
+            <p v-else class="text-foreground">They gave no reason.</p>
         </div>
 
         <!--

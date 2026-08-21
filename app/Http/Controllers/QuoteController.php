@@ -88,6 +88,10 @@ class QuoteController extends Controller
                 'customer_email' => $quote->customer->email,
                 'status' => $quote->status->value,
                 'status_label' => $quote->status->label(),
+                // Why they said no, in their own words (SPEC §3). Null when
+                // they declined without explaining, which they are entitled
+                // to do.
+                'deny_reason' => $quote->deny_reason,
                 'sent_at' => $quote->sent_at?->toIso8601String(),
                 'valid_until' => $quote->valid_until?->toDateString(),
                 // The window this quote would be sent with, which is its own

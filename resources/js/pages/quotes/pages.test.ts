@@ -310,6 +310,7 @@ describe('quotes/Edit', () => {
         customer_email: 'anna@acme.test',
         status: 'draft' as const,
         status_label: 'Draft',
+        deny_reason: null,
         sent_at: null,
         valid_until: null,
         validity_days: 30,
@@ -363,6 +364,53 @@ describe('quotes/Edit', () => {
         });
 
         expect(wrapper.text()).toContain('version 2 of 2');
+    });
+
+    /**
+     * SPEC §3: the deny reason is shown when the status is denied. Stephan
+     * needs it as much as the customer does - it is the only status that
+     * arrives with something to read.
+     */
+    it('shows why the customer declined', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: {
+                quote: {
+                    ...quote,
+                    status: 'denied',
+                    status_label: 'Denied',
+                    deny_reason: 'Te duur voor dit kwartaal.',
+                },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        expect(wrapper.text()).toContain('declined this quote');
+        expect(wrapper.text()).toContain('Te duur voor dit kwartaal.');
+    });
+
+    /**
+     * Declining without explaining is allowed, so "no reason given" is itself
+     * the thing worth saying rather than an empty panel.
+     */
+    it('says so when they declined without explaining', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: {
+                quote: { ...quote, status: 'denied', status_label: 'Denied' },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        expect(wrapper.text()).toContain('gave no reason');
+    });
+
+    it('says nothing about refusals on a quote nobody refused', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: { quote, totals: totals(), ...options },
+        });
+
+        expect(wrapper.text()).not.toContain('declined this quote');
     });
 
     /**
