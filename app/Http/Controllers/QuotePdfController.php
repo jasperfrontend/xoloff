@@ -70,6 +70,8 @@ class QuotePdfController extends Controller
         $quote->load('customer');
         $version->load('lineItems.taxClass');
 
+        $settings = AppSettings::current();
+
         $html = view('pdf.quote', [
             'quote' => $quote,
             'version' => $version,
@@ -77,7 +79,12 @@ class QuotePdfController extends Controller
             // Keyed by id so the template can reach a line's specs without
             // trusting the engine and the database to agree on ordering.
             'lineItems' => $version->lineItems->keyBy('id'),
-            'logo' => $this->logo(),
+            // Xolution's own identity, printed opposite the customer's
+            // (SPEC §7). Read live rather than snapshotted onto the version:
+            // an address is a fact about the sender today, not part of what
+            // was offered, so a correction should show on a reprint.
+            'settings' => $settings,
+            'logo' => $this->logo($settings),
         ])->render();
 
         try {
@@ -106,9 +113,9 @@ class QuotePdfController extends Controller
      * this application is not necessarily one it can reach - and on a private
      * network it certainly is not. Embedding sidesteps that entirely.
      */
-    private function logo(): ?string
+    private function logo(AppSettings $settings): ?string
     {
-        $path = AppSettings::current()->logo_path;
+        $path = $settings->logo_path;
 
         if ($path === null || ! Storage::disk('public')->exists($path)) {
             return null;

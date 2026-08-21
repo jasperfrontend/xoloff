@@ -71,8 +71,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Application-wide configuration, as opposed to the per-user screens under
     // /settings. One row, so this edits rather than creating (SPEC §3).
+    // The logo saves separately from the typed settings: a file input cannot
+    // be redisplayed with what was submitted, so one shared form would drop
+    // the chosen file whenever anything else on the screen failed validation.
     Route::get('app-settings', [AppSettingsController::class, 'edit'])->name('app-settings.edit');
-    Route::post('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
+    Route::put('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
+    Route::post('app-settings/logo', [AppSettingsController::class, 'storeLogo'])
+        ->name('app-settings.logo.store');
     Route::delete('app-settings/logo', [AppSettingsController::class, 'destroyLogo'])
         ->name('app-settings.logo.destroy');
 });

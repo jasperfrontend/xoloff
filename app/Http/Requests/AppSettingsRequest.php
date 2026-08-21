@@ -4,6 +4,11 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * The settings that are typed rather than uploaded. The logo has a form of its
+ * own (AppSettingsLogoRequest), because a form carrying a file cannot sensibly
+ * demand one and carry text fields that save without it.
+ */
 class AppSettingsRequest extends FormRequest
 {
     /**
@@ -12,48 +17,30 @@ class AppSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Required, because uploading a logo is the only thing this
-            // screen currently does, and submitting it with no file chosen
-            // should say so rather than appear to save. When M4 adds the
-            // validity window to this form, this becomes optional again.
-            //
-            // No SVG: it is a document that can carry script, and this file is
-            // rendered by a real Chromium while the PDF is produced. A raster
-            // logo is also what a print-resolution PDF wants. Both "image" and
-            // the mime list refuse it independently, which is deliberate - the
-            // day someone reaches for image:allow_svg, the mime list still
-            // holds.
-            'logo' => ['required', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048', 'dimensions:max_width=4000,max_height=4000'],
+            // Nullable throughout: these are Xolution's own details for the
+            // PDF (SPEC §7), and the real values are still being collected.
+            // Half-filled is a legitimate state - the template prints what is
+            // there and leaves out what is not - and refusing to save until
+            // all four arrive would just mean none of them get saved.
+            'company_name' => ['nullable', 'string', 'max:255'],
+            'company_address' => ['nullable', 'string', 'max:500'],
+            'company_kvk' => ['nullable', 'string', 'max:50'],
+            'company_vat_number' => ['nullable', 'string', 'max:50'],
         ];
     }
 
     /**
+     * Named as the form labels them.
+     *
      * @return array<string, string>
      */
     public function attributes(): array
     {
         return [
-            'logo' => __('logo'),
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'logo.required' => __('Choose an image file to use as the logo.'),
-
-            // Laravel's default here is "The logo failed to upload", which is
-            // true and useless: it covers a file that was too big for PHP and a
-            // server that could not write its temporary file, and points at
-            // neither. On Windows the second one happens whenever the dev
-            // server is launched from a shell with no TMP, because PHP then
-            // falls back to C:\WINDOWS and cannot write there.
-            'logo.uploaded' => __('The logo could not be uploaded. Either it is larger than the server accepts, or the server had nowhere to store it while it arrived.'),
-            'logo.mimes' => __('Upload the logo as a PNG, JPG or WebP file.'),
-            'logo.max' => __('Keep the logo under 2 MB.'),
+            'company_name' => __('company name'),
+            'company_address' => __('address'),
+            'company_kvk' => __('KvK number'),
+            'company_vat_number' => __('BTW number'),
         ];
     }
 }

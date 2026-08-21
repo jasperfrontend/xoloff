@@ -175,6 +175,94 @@ class QuotePdfTest extends TestCase
     }
 
     /**
+     * SPEC §7: the template printed the logo and the customer but nothing
+     * identifying the sender, which is conspicuous on Dutch business
+     * correspondence.
+     */
+    public function test_it_prints_xolutions_own_details_alongside_the_customers()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        AppSettings::current()->update([
+            'company_name' => 'Xolution',
+            'company_address' => 'Voorbeeldstraat 1',
+            'company_kvk' => '01234567',
+            'company_vat_number' => 'NL001234567B01',
+        ]);
+
+        $quote = $this->quote(['company_name' => 'Acme BV']);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $quote));
+
+        Http::assertSent(function (Request $request): bool {
+            $body = $request->body();
+
+            return str_contains($body, 'Xolution')
+                && str_contains($body, 'Voorbeeldstraat 1')
+                && str_contains($body, 'KvK 01234567')
+                && str_contains($body, 'BTW NL001234567B01')
+                // Both parties, not one in place of the other.
+                && str_contains($body, 'Acme BV');
+        });
+    }
+
+    /**
+     * The values are still being collected (SPEC §12), so a blank block is a
+     * legitimate state - and an empty "Van" heading over nothing would reach a
+     * customer looking like a fault.
+     */
+    public function test_it_prints_no_sender_block_while_the_details_are_blank()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
+
+        Http::assertSent(fn (Request $request): bool => ! str_contains($request->body(), '>Van<')
+            && str_contains($request->body(), '>Aan<'));
+    }
+
+    public function test_it_prints_the_details_that_have_been_filled_in_so_far()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        AppSettings::current()->update(['company_name' => 'Xolution']);
+
+        $this->actingAs(User::factory()->create())->get(route('quotes.pdf', $this->quote()));
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->body(), '>Van<')
+            && str_contains($request->body(), 'Xolution')
+            // The registration numbers are the block that stays away: "BTW"
+            // on its own also heads a column in the line items table.
+            && ! str_contains($request->body(), 'class="registration"'));
+    }
+
+    /**
+     * Read live rather than snapshotted onto the version: where the sender
+     * sits today is a fact about the sender, not part of what was offered, so
+     * a corrected address belongs on a reprint of an old version too.
+     */
+    public function test_a_corrected_address_shows_on_a_reprint_of_an_old_version()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF', 200)]);
+
+        AppSettings::current()->update(['company_address' => 'Oude straat 1']);
+
+        $quote = $this->quote();
+        $first = $quote->currentVersion;
+
+        QuoteVersion::factory()->for($quote)->create(['version_number' => 2]);
+
+        AppSettings::current()->update(['company_address' => 'Nieuwe straat 2']);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('quotes.versions.pdf', [$quote, $first]))
+            ->assertOk();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->body(), 'Nieuwe straat 2')
+            && ! str_contains($request->body(), 'Oude straat 1'));
+    }
+
+    /**
      * Every figure a customer reads has to come from the engine, not from a
      * second calculation written into the template.
      */
@@ -232,7 +320,7 @@ class QuotePdfTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->actingAs($user)->post(route('app-settings.update'), [
+        $this->actingAs($user)->post(route('app-settings.logo.store'), [
             'logo' => UploadedFile::fake()->image('xolution.png', 400, 120),
         ]);
 

@@ -11,6 +11,10 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property int $id
  * @property string|null $logo_path
+ * @property string|null $company_name
+ * @property string|null $company_address
+ * @property string|null $company_kvk
+ * @property string|null $company_vat_number
  */
 class AppSettings extends Model implements DescribesItselfForAudit
 {
@@ -20,6 +24,10 @@ class AppSettings extends Model implements DescribesItselfForAudit
 
     protected $fillable = [
         'logo_path',
+        'company_name',
+        'company_address',
+        'company_kvk',
+        'company_vat_number',
     ];
 
     public function auditLabel(): string

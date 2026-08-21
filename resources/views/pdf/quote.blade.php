@@ -89,17 +89,34 @@
             margin: 0 5pt;
         }
 
-        .addressee {
+        /* Sender and addressee side by side. Dutch business correspondence
+           carries both, and the KvK and BTW numbers are conventional enough
+           that their absence is what gets noticed (SPEC §7). */
+        .parties {
+            display: flex;
+            gap: 24pt;
             margin: 16pt 0 0;
         }
 
-        .addressee .company {
+        .party {
+            width: 50%;
+        }
+
+        .party .company {
             font-weight: 600;
         }
 
-        .addressee .lines {
+        .party .lines {
             color: var(--muted);
+            /* The address is typed as several lines and printed as it was
+               typed, rather than collapsed into one run of text. */
             white-space: pre-line;
+        }
+
+        .party .registration {
+            margin-top: 4pt;
+            color: var(--muted);
+            font-size: 9pt;
         }
 
         .intro {
@@ -269,12 +286,39 @@
     @endif
 </div>
 
-<div class="addressee">
-    <h2>Aan</h2>
-    <div class="company">{{ $quote->customer->company_name }}</div>
-    <div class="lines">{{ $quote->customer->contact_person }}
+<div class="parties">
+    {{-- Only what has actually been filled in on the settings screen. The
+         values are collected once and rarely change, so a half-filled block
+         beats a placeholder that could reach a customer. --}}
+    @if (filled($settings->company_name) || filled($settings->company_address) || filled($settings->company_kvk) || filled($settings->company_vat_number))
+        <div class="party">
+            <h2>Van</h2>
+            @if (filled($settings->company_name))
+                <div class="company">{{ $settings->company_name }}</div>
+            @endif
+            @if (filled($settings->company_address))
+                <div class="lines">{{ $settings->company_address }}</div>
+            @endif
+            @if (filled($settings->company_kvk) || filled($settings->company_vat_number))
+                <div class="registration">
+                    @if (filled($settings->company_kvk))
+                        <div>KvK {{ $settings->company_kvk }}</div>
+                    @endif
+                    @if (filled($settings->company_vat_number))
+                        <div>BTW {{ $settings->company_vat_number }}</div>
+                    @endif
+                </div>
+            @endif
+        </div>
+    @endif
+
+    <div class="party">
+        <h2>Aan</h2>
+        <div class="company">{{ $quote->customer->company_name }}</div>
+        <div class="lines">{{ $quote->customer->contact_person }}
 {{ $quote->customer->billing_address }}
 {{ $quote->customer->country }}</div>
+    </div>
 </div>
 
 @if (filled($version->intro_text_snapshot))

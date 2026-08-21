@@ -286,7 +286,7 @@ class AuditLogTest extends TestCase
         AuditLogEntry::query()->delete();
 
         $this->actingAs(User::factory()->create())
-            ->post(route('app-settings.update'), [
+            ->post(route('app-settings.logo.store'), [
                 'logo' => UploadedFile::fake()->image('xolution.png'),
             ])
             ->assertSessionHasNoErrors();

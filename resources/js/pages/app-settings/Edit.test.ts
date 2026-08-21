@@ -2,24 +2,39 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
 import AppSettingsEdit from '@/pages/app-settings/Edit.vue';
-import { resetInertiaStub } from '@/test-support/inertia';
+import { resetInertiaStub, submissions } from '@/test-support/inertia';
 
 vi.mock('@inertiajs/vue3', async () =>
     (await import('@/test-support/inertia')).inertiaStub(),
 );
 
-function build(
-    settings: { logo_path: string | null; logo_url: string | null } = {
-        logo_path: null,
-        logo_url: null,
-    },
-) {
-    return mount(AppSettingsEdit, { props: { settings } });
+type Settings = InstanceType<typeof AppSettingsEdit>['$props']['settings'];
+
+const blank: Settings = {
+    logo_path: null,
+    logo_url: null,
+    company_name: null,
+    company_address: null,
+    company_kvk: null,
+    company_vat_number: null,
+};
+
+function build(settings: Partial<Settings> = {}) {
+    return mount(AppSettingsEdit, {
+        props: { settings: { ...blank, ...settings } },
+    });
 }
 
 const uploaded = {
     logo_path: 'logos/xolution.png',
     logo_url: '/storage/logos/xolution.png',
+};
+
+const details = {
+    company_name: 'Xolution',
+    company_address: 'Voorbeeldstraat 1',
+    company_kvk: '01234567',
+    company_vat_number: 'NL001234567B01',
 };
 
 describe('app-settings/Edit', () => {
@@ -82,5 +97,92 @@ describe('app-settings/Edit', () => {
             .props('description');
 
         expect(description).toContain('keep the logo they were printed with');
+    });
+
+    /**
+     * Xolution's own details print on every quote PDF (SPEC §7). The address
+     * is a textarea rather than an input, because it is several lines and is
+     * printed with the breaks it was typed with.
+     */
+    describe('the details printed on quotes', () => {
+        it('shows what has already been saved', () => {
+            const wrapper = build(details);
+
+            expect(
+                (
+                    wrapper.find('input[name="company_name"]')
+                        .element as HTMLInputElement
+                ).value,
+            ).toBe('Xolution');
+            expect(
+                (
+                    wrapper.find('textarea[name="company_address"]')
+                        .element as HTMLTextAreaElement
+                ).value,
+            ).toBe('Voorbeeldstraat 1');
+            expect(
+                (
+                    wrapper.find('input[name="company_kvk"]')
+                        .element as HTMLInputElement
+                ).value,
+            ).toBe('01234567');
+            expect(
+                (
+                    wrapper.find('input[name="company_vat_number"]')
+                        .element as HTMLInputElement
+                ).value,
+            ).toBe('NL001234567B01');
+        });
+
+        it('starts empty rather than showing the word null', () => {
+            const wrapper = build();
+
+            expect(wrapper.text()).not.toContain('null');
+            expect(
+                (
+                    wrapper.find('input[name="company_name"]')
+                        .element as HTMLInputElement
+                ).value,
+            ).toBe('');
+        });
+
+        /**
+         * The values are still being collected, so the server takes them one
+         * at a time and the form must not demand the rest.
+         */
+        it('demands none of them', () => {
+            const wrapper = build();
+
+            for (const name of Object.keys(details)) {
+                expect(
+                    wrapper.find(`[name="${name}"]`).attributes('required'),
+                ).toBeUndefined();
+            }
+        });
+
+        it('submits all four under the names the server reads', async () => {
+            const wrapper = build(details);
+
+            await wrapper.findAll('form')[0].trigger('submit');
+
+            expect(submissions).toHaveLength(1);
+            expect(submissions[0].data).toEqual(details);
+        });
+
+        /**
+         * Two forms on one screen. Sharing one would mean a validation error
+         * on any field silently dropped the chosen file, which a file input
+         * cannot be repopulated with.
+         */
+        it('saves separately from the logo', () => {
+            const wrapper = build();
+            const forms = wrapper.findAll('form');
+
+            expect(forms).toHaveLength(2);
+            expect(forms[0].find('input[type="file"]').exists()).toBe(false);
+            expect(forms[1].find('input[name="company_name"]').exists()).toBe(
+                false,
+            );
+        });
     });
 });

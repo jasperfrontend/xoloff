@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AppSettingsLogoRequest;
 use App\Http\Requests\AppSettingsRequest;
 use App\Models\AppSettings;
 use Illuminate\Http\RedirectResponse;
@@ -12,8 +13,14 @@ use Inertia\Response;
 
 /**
  * Application-wide configuration, as opposed to the per-user screens under
- * /settings. For now that is the logo the quote template prints (SPEC §6);
- * the validity window arrives in M4 and the notification toggles in M7.
+ * /settings. The logo the quote template prints (SPEC §6) and Xolution's own
+ * details printed alongside it (SPEC §7); the notification toggles arrive
+ * in M7.
+ *
+ * The logo saves through its own route rather than with the rest. A file
+ * input cannot be redisplayed with what was submitted, so bundling the two
+ * would mean a validation error anywhere on the screen silently dropped the
+ * chosen file.
  */
 class AppSettingsController extends Controller
 {
@@ -27,11 +34,24 @@ class AppSettingsController extends Controller
                 'logo_url' => $settings->logo_path === null
                     ? null
                     : Storage::disk('public')->url($settings->logo_path),
+                'company_name' => $settings->company_name,
+                'company_address' => $settings->company_address,
+                'company_kvk' => $settings->company_kvk,
+                'company_vat_number' => $settings->company_vat_number,
             ],
         ]);
     }
 
     public function update(AppSettingsRequest $request): RedirectResponse
+    {
+        AppSettings::current()->update($request->validated());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Settings saved.')]);
+
+        return to_route('app-settings.edit');
+    }
+
+    public function storeLogo(AppSettingsLogoRequest $request): RedirectResponse
     {
         $settings = AppSettings::current();
         $logo = $request->file('logo');
