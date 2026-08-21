@@ -2,43 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AuditAction;
-use App\Models\AppSettings;
+use App\Actions\Quotes\RenderQuotePdf;
 use App\Models\Quote;
 use App\Models\QuoteVersion;
-use App\Support\Audit\AuditLog;
-use App\Support\Pdf\Gotenberg;
 use App\Support\Pdf\PdfUnavailable;
-use App\Support\Quotes\QuoteCalculator;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * "Download PDF" (SPEC §6). No email, no portal, no signature involved - those
- * are M4 and later.
+ * "Download PDF" from inside the app (SPEC §6). The customer's own copy comes
+ * through the portal instead, from the same action.
  */
 class QuotePdfController extends Controller
 {
-    /**
-     * The page margins the quote template is designed around. They live here
-     * rather than in the template's CSS because Chromium's print API owns them
-     * and ignores an @page rule. The extra room at the foot is for the page
-     * numbers Gotenberg repeats there.
-     *
-     * @var array<string, string>
-     */
-    private const MARGINS = [
-        'top' => '18mm',
-        'bottom' => '24mm',
-        'left' => '16mm',
-        'right' => '16mm',
-    ];
-
-    public function __construct(
-        private readonly Gotenberg $gotenberg,
-        private readonly QuoteCalculator $calculator,
-    ) {}
+    public function __construct(private readonly RenderQuotePdf $renderQuotePdf) {}
 
     /**
      * The quote as it currently stands.
@@ -67,70 +44,12 @@ class QuotePdfController extends Controller
 
     private function download(Quote $quote, QuoteVersion $version): Response|RedirectResponse
     {
-        $quote->load('customer');
-        $version->load('lineItems.taxClass');
-
-        $settings = AppSettings::current();
-
-        $html = view('pdf.quote', [
-            'quote' => $quote,
-            'version' => $version,
-            'totals' => $this->calculator->calculate($version),
-            // Keyed by id so the template can reach a line's specs without
-            // trusting the engine and the database to agree on ordering.
-            'lineItems' => $version->lineItems->keyBy('id'),
-            // Xolution's own identity, printed opposite the customer's
-            // (SPEC §7). Read live rather than snapshotted onto the version:
-            // an address is a fact about the sender today, not part of what
-            // was offered, so a correction should show on a reprint.
-            'settings' => $settings,
-            'logo' => $this->logo($settings),
-        ])->render();
-
         try {
-            $pdf = $this->gotenberg->render($html, view('pdf.footer')->render(), self::MARGINS);
+            return $this->renderQuotePdf->handle($quote, $version);
         } catch (PdfUnavailable $exception) {
             // Shown rather than logged: whoever pressed Download needs to know
             // whether to wait, to fix something, or to give up.
             return back()->withErrors(['pdf' => $exception->getMessage()]);
         }
-
-        AuditLog::record($version, AuditAction::Exported, [
-            ...$version->auditContext(),
-            'attributes' => ['filename' => $this->filename($quote, $version)],
-        ]);
-
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$this->filename($quote, $version).'"',
-        ]);
-    }
-
-    /**
-     * The logo as a data url rather than a link.
-     *
-     * Gotenberg renders in its own container, so an address pointing back at
-     * this application is not necessarily one it can reach - and on a private
-     * network it certainly is not. Embedding sidesteps that entirely.
-     */
-    private function logo(AppSettings $settings): ?string
-    {
-        $path = $settings->logo_path;
-
-        if ($path === null || ! Storage::disk('public')->exists($path)) {
-            return null;
-        }
-
-        return 'data:'.Storage::disk('public')->mimeType($path)
-            .';base64,'.base64_encode(Storage::disk('public')->get($path) ?? '');
-    }
-
-    private function filename(Quote $quote, QuoteVersion $version): string
-    {
-        // No spaces and no accents: this string travels through a download
-        // header and a customer's file system.
-        $customer = preg_replace('/[^A-Za-z0-9]+/', '-', $quote->customer->company_name) ?? '';
-
-        return trim("offerte-{$quote->id}-v{$version->version_number}-".strtolower($customer), '-').'.pdf';
     }
 }

@@ -2,25 +2,35 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Actions\Quotes\RenderQuotePdf;
 use App\Enums\QuoteStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AppSettings;
 use App\Models\Quote;
+use App\Models\QuoteLineItem;
+use App\Models\QuoteVersion;
+use App\Support\Pdf\PdfUnavailable;
+use App\Support\Quotes\QuoteCalculator;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\Response as InertiaResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * What the customer reaches through the magic link (SPEC §7).
+ * What the customer reaches through the magic link (SPEC §7, §8).
  *
- * Deliberately thin for now: it confirms whose quote this is and how long it
- * stands, and it records that the customer looked. Reading the quote itself
- * and approving or denying it is M5 (SPEC §8), which fills this page in rather
- * than replacing it.
+ * The whole surface is: read the current version, take a copy, say yes or no.
+ * No comment field, no "request a call", no history of their past quotes -
+ * SPEC §8 names all three as deliberately absent.
  */
 class QuotePortalController extends Controller
 {
-    public function __invoke(Quote $quote): Response
+    public function __construct(
+        private readonly QuoteCalculator $calculator,
+        private readonly RenderQuotePdf $renderQuotePdf,
+    ) {}
+
+    public function __invoke(Quote $quote): InertiaResponse
     {
         $settings = AppSettings::current();
 
@@ -39,6 +49,7 @@ class QuotePortalController extends Controller
         $this->recordTheVisit($quote);
 
         $quote->load('customer:id,company_name,contact_person');
+        $version = $quote->currentVersion()->with('lineItems.taxClass')->first();
 
         return Inertia::render('portal/Quote', [
             'sender' => $this->sender($settings),
@@ -47,8 +58,44 @@ class QuotePortalController extends Controller
                 'company_name' => $quote->customer->company_name,
                 'contact_person' => $quote->customer->contact_person,
                 'valid_until' => $quote->valid_until?->toDateString(),
+                'pdf_url' => route('portal.quote.pdf', $quote->magic_link_token),
             ],
+            // Null is reachable only if the quote's last version was removed
+            // after it was sent. The page then stands as the cover it was in
+            // M4 rather than rendering an empty table.
+            'version' => $version === null ? null : $this->version($version),
+            'totals' => $version === null ? null : $this->calculator->calculate($version),
         ]);
+    }
+
+    /**
+     * The customer's own copy of the document.
+     *
+     * The same PDF the two of them download internally, from the same action:
+     * a quote that reads differently depending on who asked for it would be
+     * the worst kind of bug to find out about late.
+     */
+    public function pdf(Quote $quote): Response
+    {
+        // An expired link stops being a way to fetch things, not just a way to
+        // read them. Otherwise the gentle page would be a doorway rather than
+        // an ending.
+        abort_if($quote->hasExpired(), 404);
+
+        $version = $quote->currentVersion;
+
+        abort_if($version === null, 404);
+
+        try {
+            return $this->renderQuotePdf->handle($quote, $version);
+        } catch (PdfUnavailable) {
+            // The customer can neither wait usefully nor fix this, and the
+            // internal wording names environment variables at them. The page
+            // they came from still shows the whole quote, so sending them back
+            // to it is not a dead end.
+            return redirect()->route('portal.quote', $quote->magic_link_token)
+                ->withErrors(['pdf' => __('De offerte kan op dit moment niet als PDF worden klaargezet. Probeer het over een paar minuten opnieuw.')]);
+        }
     }
 
     /**
@@ -66,6 +113,29 @@ class QuotePortalController extends Controller
         if ($quote->status === QuoteStatus::Sent) {
             $quote->transitionTo(QuoteStatus::Opened);
         }
+    }
+
+    /**
+     * The version as the customer reads it: the texts it was saved with, and
+     * its lines with the specs that belong to them.
+     *
+     * @return array<string, mixed>
+     */
+    private function version(QuoteVersion $version): array
+    {
+        return [
+            'version_number' => $version->version_number,
+            'intro_text_snapshot' => $version->intro_text_snapshot,
+            'footer_text_snapshot' => $version->footer_text_snapshot,
+            'line_items' => $version->lineItems->map(fn (QuoteLineItem $lineItem): array => [
+                'id' => $lineItem->id,
+                'name' => $lineItem->name,
+                'specs' => $lineItem->specs,
+                'quantity' => $lineItem->quantity,
+                'unit_price_ex_vat' => $lineItem->unit_price_ex_vat,
+                'tax_class_percentage' => $lineItem->taxClass->percentage,
+            ])->all(),
+        ];
     }
 
     /**

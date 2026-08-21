@@ -8,16 +8,19 @@ use App\Models\AppSettings;
 use App\Models\AuditLogEntry;
 use App\Models\Customer;
 use App\Models\Quote;
+use App\Models\QuoteVersion;
+use App\Models\TaxClass;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
  * The magic link, and what visiting it records (SPEC §7).
  *
- * Reading the quote itself and approving or denying it is M5, so what this
- * covers is the link working, the visit being noticed, and the window closing
- * gently rather than with a 404.
+ * Covers the link working, the visit being noticed, the window closing gently
+ * rather than with a 404, and the quote itself being readable (SPEC §8).
  */
 class QuotePortalTest extends TestCase
 {
@@ -161,12 +164,156 @@ class QuotePortalTest extends TestCase
         $this->get(route('portal.quote', 'null'))->assertNotFound();
     }
 
+    public function test_the_customer_can_read_the_quote_itself()
+    {
+        $quote = $this->sentQuote();
+        $this->addAVersionTo($quote);
+
+        $this->get($this->link($quote))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('portal/Quote')
+                ->where('version.version_number', 1)
+                ->has('version.line_items', 1)
+                ->where('version.line_items.0.name', 'Managed hosting')
+                ->where('version.line_items.0.specs.Billing period', 'Monthly'),
+            );
+    }
+
+    /**
+     * SPEC §5 is implemented once, in PHP. The page displays what the engine
+     * says and holds no second opinion about the money.
+     */
+    public function test_the_figures_come_from_the_engine()
+    {
+        $quote = $this->sentQuote();
+        $this->addAVersionTo($quote);
+
+        $this->get($this->link($quote))
+            ->assertInertia(fn (Assert $page) => $page
+                // Two at 90.00 with 21% VAT: 180.00 net, 37.80 VAT, 217.80.
+                ->where('totals.subtotal', '180.00')
+                ->where('totals.total', '217.80')
+                ->where('totals.taxClassTotals.0.vat', '37.80'),
+            );
+    }
+
+    /**
+     * Snapshotted with the version, so a quote already sent keeps the terms it
+     * was sent under (SPEC §3).
+     */
+    public function test_the_texts_are_the_ones_the_version_was_saved_with()
+    {
+        $quote = $this->sentQuote();
+        $version = $this->addAVersionTo($quote);
+        $version->update([
+            'intro_text_snapshot' => '<p>Beste klant</p>',
+            'footer_text_snapshot' => '<p>Algemene voorwaarden van toepassing</p>',
+        ]);
+
+        $this->get($this->link($quote))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('version.intro_text_snapshot', '<p>Beste klant</p>')
+                ->where('version.footer_text_snapshot', '<p>Algemene voorwaarden van toepassing</p>'),
+            );
+    }
+
+    /**
+     * Only reachable if the last version was removed after the quote was sent.
+     * The page then stands as the cover it was rather than rendering an empty
+     * table at a customer.
+     */
+    public function test_a_quote_whose_version_went_missing_still_opens()
+    {
+        $quote = $this->sentQuote();
+
+        $this->get($this->link($quote))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('portal/Quote')
+                ->where('version', null)
+                ->where('totals', null),
+            );
+    }
+
+    /**
+     * The same document the two of them download internally, from the same
+     * action. A quote that read differently depending on who asked for it
+     * would be the worst kind of bug to find late.
+     */
+    public function test_the_customer_can_take_a_copy_as_a_pdf()
+    {
+        Http::fake(['pdf.test/*' => Http::response('%PDF-1.7 fake', 200)]);
+        config()->set('services.gotenberg.url', 'https://pdf.test');
+
+        $quote = $this->sentQuote(['company_name' => 'Acme BV']);
+        $this->addAVersionTo($quote);
+
+        $response = $this->get(route('portal.quote.pdf', $quote->magic_link_token))
+            ->assertOk();
+
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeader(
+            'content-disposition',
+            'attachment; filename="offerte-'.$quote->id.'-v1-acme-bv.pdf"',
+        );
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->body(), 'Managed hosting'));
+    }
+
+    /**
+     * An expired link stops being a way to fetch things, not only a way to
+     * read them. Otherwise the gentle page would be a doorway rather than an
+     * ending.
+     */
+    public function test_an_expired_link_cannot_still_fetch_the_pdf()
+    {
+        Http::fake();
+        config()->set('services.gotenberg.url', 'https://pdf.test');
+
+        $quote = $this->sentQuote(validForDays: -1);
+        $this->addAVersionTo($quote);
+
+        $this->get(route('portal.quote.pdf', $quote->magic_link_token))->assertNotFound();
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * The customer can neither wait usefully nor act on the internal wording,
+     * which names environment variables. The page they came from still shows
+     * the whole quote, so this is not a dead end.
+     */
+    public function test_a_pdf_that_cannot_be_produced_sends_them_back_in_dutch()
+    {
+        config()->set('services.gotenberg.url', null);
+
+        $quote = $this->sentQuote();
+        $this->addAVersionTo($quote);
+
+        $this->get(route('portal.quote.pdf', $quote->magic_link_token))
+            ->assertRedirect(route('portal.quote', $quote->magic_link_token))
+            ->assertSessionHasErrors(['pdf' => 'De offerte kan op dit moment niet als PDF worden klaargezet. Probeer het over een paar minuten opnieuw.']);
+    }
+
+    public function test_an_unknown_link_has_no_pdf_either()
+    {
+        Http::fake();
+
+        $this->get(route('portal.quote.pdf', str_repeat('a', 64)))->assertNotFound();
+
+        Http::assertNothingSent();
+    }
+
     /**
      * The page is served to whoever holds the link, so what it hands back
-     * matters. The address necessarily contains the token; the props must not
-     * carry it again, nor anything about the two people who built the quote.
+     * matters.
+     *
+     * The token is in the address, and now legitimately in the props too - the
+     * download link has to be addressable. What this pins is that the download
+     * link is the only place it appears: a credential that has one reason to be
+     * on a page should not quietly acquire a second.
      */
-    public function test_the_page_carries_nothing_it_should_not()
+    public function test_the_token_appears_only_in_the_download_link()
     {
         $quote = $this->sentQuote();
 
@@ -175,12 +322,27 @@ class QuotePortalTest extends TestCase
         /** @var array{props: array<string, mixed>} $page */
         $page = $response->viewData('page');
 
-        $this->assertStringNotContainsString(
+        $props = $page['props'];
+        $this->assertStringContainsString(
             (string) $quote->magic_link_token,
-            (string) json_encode($page['props']),
+            (string) ($props['quote']['pdf_url'] ?? ''),
         );
 
-        $response->assertInertia(fn (Assert $page) => $page->where('auth.user', null));
+        unset($props['quote']['pdf_url']);
+
+        $this->assertStringNotContainsString(
+            (string) $quote->magic_link_token,
+            (string) json_encode($props),
+        );
+    }
+
+    /**
+     * Nothing about the two people who built the quote reaches the customer.
+     */
+    public function test_the_page_says_nothing_about_who_built_it()
+    {
+        $this->get($this->link($this->sentQuote()))
+            ->assertInertia(fn (Assert $page) => $page->where('auth.user', null));
     }
 
     public function test_the_page_shows_who_the_quote_is_from()
@@ -207,5 +369,20 @@ class QuotePortalTest extends TestCase
     private function link(Quote $quote): string
     {
         return route('portal.quote', $quote->magic_link_token);
+    }
+
+    private function addAVersionTo(Quote $quote): QuoteVersion
+    {
+        $version = QuoteVersion::factory()->for($quote)->create(['version_number' => 1]);
+
+        $version->lineItems()->create([
+            'name' => 'Managed hosting',
+            'specs' => ['Billing period' => 'Monthly'],
+            'quantity' => 2,
+            'unit_price_ex_vat' => 90.00,
+            'tax_class_id' => TaxClass::factory()->create(['percentage' => 21.00])->id,
+        ]);
+
+        return $version->fresh();
     }
 }

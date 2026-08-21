@@ -28,6 +28,11 @@ Route::redirect('/', '/dashboard')->name('home');
 Route::get('offerte/{quote:magic_link_token}', QuotePortalController::class)
     ->name('portal.quote');
 
+// The customer's own copy of the document, scoped to the token rather than to
+// a quote id: holding the link is the only thing that grants any of this.
+Route::get('offerte/{quote:magic_link_token}/pdf', [QuotePortalController::class, 'pdf'])
+    ->name('portal.quote.pdf');
+
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 
