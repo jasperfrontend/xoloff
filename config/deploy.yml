@@ -68,12 +68,10 @@ env:
     CACHE_STORE: database
     QUEUE_CONNECTION: database
 
-    # Deliberately the log mailer for now. Linode blocks outbound SMTP on new
-    # instances (verified 2026-08-21: every SMTP port refused to every
-    # destination while ordinary HTTPS worked), and a support ticket is open.
-    # Sending a quote still works and fails honestly - the link is issued and
-    # shown on screen with a message saying the email did not go out.
-    MAIL_MAILER: log
+    # Linode restricts outbound SMTP on new instances; lifted for this one by
+    # support on 2026-08-21. Deleting the Linode reimposes it - rebuild rather
+    # than delete if this box is ever recycled.
+    MAIL_MAILER: smtp
 
     # Boot steps in docker/entrypoint.sh. Behind flags so a second role added
     # later does not race this one to migrate.
@@ -91,6 +89,10 @@ env:
     # automatically would reset a password someone had changed.
     - SEED_JASPER_PASSWORD
     - SEED_STEPHAN_PASSWORD
+    - XOL_SMTP
+    - XOL_PORT
+    - XOL_FROM
+    - XOL_PASS
 
 accessories:
   postgres:

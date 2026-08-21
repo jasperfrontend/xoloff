@@ -115,6 +115,10 @@ jobs:
           GOTENBERG_API_BASIC_AUTH_PASSWORD: ${{ secrets.GOTENBERG_API_BASIC_AUTH_PASSWORD }}
           SEED_JASPER_PASSWORD: ${{ secrets.SEED_JASPER_PASSWORD }}
           SEED_STEPHAN_PASSWORD: ${{ secrets.SEED_STEPHAN_PASSWORD }}
+          XOL_SMTP: ${{ secrets.XOL_SMTP }}
+          XOL_PORT: ${{ secrets.XOL_PORT }}
+          XOL_FROM: ${{ secrets.XOL_FROM }}
+          XOL_PASS: ${{ secrets.XOL_PASS }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$KAMAL_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
@@ -137,7 +141,7 @@ jobs:
             for v in KAMAL_REGISTRY_PASSWORD APP_KEY DB_PASSWORD POSTGRES_PASSWORD \
                      GOTENBERG_URL GOTENBERG_API_BASIC_AUTH_USERNAME \
                      GOTENBERG_API_BASIC_AUTH_PASSWORD \
-                     SEED_JASPER_PASSWORD SEED_STEPHAN_PASSWORD; do
+                     SEED_JASPER_PASSWORD SEED_STEPHAN_PASSWORD                      XOL_SMTP XOL_PORT XOL_FROM XOL_PASS; do
               printf '%s=%q\n' "$v" "${!v}"
             done
           } > .kamal/secrets
