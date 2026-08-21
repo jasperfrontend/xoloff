@@ -6,35 +6,31 @@ import CustomerForm from '@/pages/customers/Form.vue';
 import { create, index } from '@/routes/customers';
 
 defineProps<{
-    countries: Record<string, string>;
-    salutations: Record<string, string>;
+  countries: Record<string, string>;
+  salutations: Record<string, string>;
 }>();
 
 defineOptions({
-    layout: {
-        breadcrumbs: [
-            { title: 'Customers', href: index() },
-            { title: 'New customer', href: create() },
-        ],
-    },
+  layout: {
+    breadcrumbs: [
+      { title: 'Customers', href: index() },
+      { title: 'New customer', href: create() },
+    ],
+  },
 });
 </script>
 
 <template>
-    <Head title="New customer" />
+  <Head title="New customer" />
 
-    <div class="flex flex-col space-y-6 p-4">
-        <Heading
-            variant="small"
-            title="New customer"
-            description="Add a company you send quotes to"
-        />
+  <div class="flex flex-col space-y-6 p-4">
+    <Heading variant="small" title="New customer" description="Add a company you send quotes to" />
 
-        <CustomerForm
-            :action="CustomerController.store.form()"
-            :countries="countries"
-            :salutations="salutations"
-            submit-label="Create customer"
-        />
-    </div>
+    <CustomerForm
+      :action="CustomerController.store.form()"
+      :countries="countries"
+      :salutations="salutations"
+      submit-label="Create customer"
+    />
+  </div>
 </template>

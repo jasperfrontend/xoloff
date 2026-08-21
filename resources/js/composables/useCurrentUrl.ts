@@ -5,90 +5,84 @@ import { computed, readonly } from 'vue';
 import { toUrl } from '@/lib/utils';
 
 export type UseCurrentUrlReturn = {
-    currentUrl: DeepReadonly<ComputedRef<string>>;
-    isCurrentUrl: (
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        currentUrl?: string,
-        startsWith?: boolean,
-    ) => boolean;
-    isCurrentOrParentUrl: (
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        currentUrl?: string,
-    ) => boolean;
-    whenCurrentUrl: <T, F = null>(
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        ifTrue: T,
-        ifFalse?: F,
-    ) => T | F;
+  currentUrl: DeepReadonly<ComputedRef<string>>;
+  isCurrentUrl: (
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    currentUrl?: string,
+    startsWith?: boolean,
+  ) => boolean;
+  isCurrentOrParentUrl: (
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    currentUrl?: string,
+  ) => boolean;
+  whenCurrentUrl: <T, F = null>(
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    ifTrue: T,
+    ifFalse?: F,
+  ) => T | F;
 };
 
 const page = usePage();
 const currentUrlReactive = computed(
-    () =>
-        new URL(
-            page.url,
-            typeof window !== 'undefined'
-                ? window.location.origin
-                : 'http://localhost',
-        ).pathname,
+  () =>
+    new URL(page.url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+      .pathname,
 );
 
 export function useCurrentUrl(): UseCurrentUrlReturn {
-    function isCurrentUrl(
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        currentUrl?: string,
-        startsWith: boolean = false,
-    ) {
-        const urlToCompare = currentUrl ?? currentUrlReactive.value;
-        const urlString = toUrl(urlToCheck);
+  function isCurrentUrl(
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    currentUrl?: string,
+    startsWith: boolean = false,
+  ) {
+    const urlToCompare = currentUrl ?? currentUrlReactive.value;
+    const urlString = toUrl(urlToCheck);
 
-        // A parent match is by path segment, not by characters. Plain
-        // startsWith makes /settings/app a parent of /settings/appearance,
-        // which lit up two navigation items at once.
-        const comparePath = (path: string): boolean => {
-            if (!startsWith) {
-                return path === urlToCompare;
-            }
+    // A parent match is by path segment, not by characters. Plain
+    // startsWith makes /settings/app a parent of /settings/appearance,
+    // which lit up two navigation items at once.
+    const comparePath = (path: string): boolean => {
+      if (!startsWith) {
+        return path === urlToCompare;
+      }
 
-            const parent = path.endsWith('/') ? path.slice(0, -1) : path;
+      const parent = path.endsWith('/') ? path.slice(0, -1) : path;
 
-            return (
-                urlToCompare === parent || urlToCompare.startsWith(`${parent}/`)
-            );
-        };
-
-        if (!urlString.startsWith('http')) {
-            return comparePath(urlString);
-        }
-
-        try {
-            const absoluteUrl = new URL(urlString);
-
-            return comparePath(absoluteUrl.pathname);
-        } catch {
-            return false;
-        }
-    }
-
-    function isCurrentOrParentUrl(
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        currentUrl?: string,
-    ) {
-        return isCurrentUrl(urlToCheck, currentUrl, true);
-    }
-
-    function whenCurrentUrl(
-        urlToCheck: NonNullable<InertiaLinkProps['href']>,
-        ifTrue: any,
-        ifFalse: any = null,
-    ) {
-        return isCurrentUrl(urlToCheck) ? ifTrue : ifFalse;
-    }
-
-    return {
-        currentUrl: readonly(currentUrlReactive),
-        isCurrentUrl,
-        isCurrentOrParentUrl,
-        whenCurrentUrl,
+      return urlToCompare === parent || urlToCompare.startsWith(`${parent}/`);
     };
+
+    if (!urlString.startsWith('http')) {
+      return comparePath(urlString);
+    }
+
+    try {
+      const absoluteUrl = new URL(urlString);
+
+      return comparePath(absoluteUrl.pathname);
+    } catch {
+      return false;
+    }
+  }
+
+  function isCurrentOrParentUrl(
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    currentUrl?: string,
+  ) {
+    return isCurrentUrl(urlToCheck, currentUrl, true);
+  }
+
+  function whenCurrentUrl(
+    urlToCheck: NonNullable<InertiaLinkProps['href']>,
+    ifTrue: any,
+    ifFalse: any = null,
+  ) {
+    return isCurrentUrl(urlToCheck) ? ifTrue : ifFalse;
+  }
+
+  return {
+    currentUrl: readonly(currentUrlReactive),
+    isCurrentUrl,
+    isCurrentOrParentUrl,
+    whenCurrentUrl,
+  };
 }

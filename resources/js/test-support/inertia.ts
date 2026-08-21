@@ -12,9 +12,9 @@ import type { PropType } from 'vue';
  */
 
 export const submissions: {
-    method: string;
-    url: string;
-    data: Record<string, unknown>;
+  method: string;
+  url: string;
+  data: Record<string, unknown>;
 }[] = [];
 
 /**
@@ -23,16 +23,16 @@ export const submissions: {
  * filters should not have to know that.
  */
 export const visits: {
-    url: string;
-    data: Record<string, unknown>;
+  url: string;
+  data: Record<string, unknown>;
 }[] = [];
 
 export const pageProps: Record<string, unknown> = reactive({
-    name: 'Xoloff',
-    sidebarOpen: false,
-    auth: { user: { id: 1, name: 'Test', email: 'test@example.test' } },
-    flash: {},
-    errors: {} as Record<string, string>,
+  name: 'Xoloff',
+  sidebarOpen: false,
+  auth: { user: { id: 1, name: 'Test', email: 'test@example.test' } },
+  flash: {},
+  errors: {} as Record<string, string>,
 });
 
 /**
@@ -40,9 +40,9 @@ export const pageProps: Record<string, unknown> = reactive({
  * one needs a head provider.
  */
 const Head = defineComponent({
-    name: 'HeadStub',
-    props: { title: { type: String, default: '' } },
-    setup: () => () => null,
+  name: 'HeadStub',
+  props: { title: { type: String, default: '' } },
+  setup: () => () => null,
 });
 
 /**
@@ -50,29 +50,26 @@ const Head = defineComponent({
  * anchor keeps href assertions honest without any of that machinery.
  */
 const Link = defineComponent({
-    name: 'LinkStub',
-    props: {
-        href: {
-            type: [String, Object] as PropType<string | { url: string }>,
-            default: '',
-        },
-        method: { type: String, default: 'get' },
-        as: { type: String, default: 'a' },
+  name: 'LinkStub',
+  props: {
+    href: {
+      type: [String, Object] as PropType<string | { url: string }>,
+      default: '',
     },
-    setup:
-        (props, { slots }) =>
-        () =>
-            h(
-                props.as,
-                {
-                    href:
-                        typeof props.href === 'string'
-                            ? props.href
-                            : props.href?.url,
-                    'data-method': props.method,
-                },
-                slots.default?.(),
-            ),
+    method: { type: String, default: 'get' },
+    as: { type: String, default: 'a' },
+  },
+  setup:
+    (props, { slots }) =>
+    () =>
+      h(
+        props.as,
+        {
+          href: typeof props.href === 'string' ? props.href : props.href?.url,
+          'data-method': props.method,
+        },
+        slots.default?.(),
+      ),
 });
 
 /**
@@ -80,62 +77,51 @@ const Link = defineComponent({
  * Submitting records the attempt rather than issuing a request.
  */
 const Form = defineComponent({
-    name: 'FormStub',
-    props: {
-        action: {
-            type: [String, Object] as PropType<
-                string | Record<string, unknown>
-            >,
-            default: '',
-        },
-        method: { type: String, default: 'post' },
-        transform: {
-            type: Function as PropType<
-                (data: Record<string, unknown>) => Record<string, unknown>
-            >,
-            default: undefined,
-        },
+  name: 'FormStub',
+  props: {
+    action: {
+      type: [String, Object] as PropType<string | Record<string, unknown>>,
+      default: '',
     },
-    setup(props, { slots }) {
-        const state = reactive({
-            errors: {},
-            processing: false,
-            wasSuccessful: false,
-        });
+    method: { type: String, default: 'post' },
+    transform: {
+      type: Function as PropType<(data: Record<string, unknown>) => Record<string, unknown>>,
+      default: undefined,
+    },
+  },
+  setup(props, { slots }) {
+    const state = reactive({
+      errors: {},
+      processing: false,
+      wasSuccessful: false,
+    });
 
-        return () =>
-            h(
-                'form',
-                {
-                    onSubmit: (event: Event) => {
-                        event.preventDefault();
+    return () =>
+      h(
+        'form',
+        {
+          onSubmit: (event: Event) => {
+            event.preventDefault();
 
-                        // Collected from the DOM exactly as the real Form
-                        // does, so a field that was never given a name shows
-                        // up here as missing rather than passing silently.
-                        // Hidden inputs count, which is how a page submits a
-                        // value that has no input of its own.
-                        const fields = Object.fromEntries(
-                            new FormData(
-                                event.target as HTMLFormElement,
-                            ).entries(),
-                        );
-
-                        submissions.push({
-                            method: props.method,
-                            url:
-                                typeof props.action === 'string'
-                                    ? props.action
-                                    : '',
-                            data: props.transform
-                                ? props.transform(fields)
-                                : fields,
-                        });
-                    },
-                },
-                slots.default?.(state),
+            // Collected from the DOM exactly as the real Form
+            // does, so a field that was never given a name shows
+            // up here as missing rather than passing silently.
+            // Hidden inputs count, which is how a page submits a
+            // value that has no input of its own.
+            const fields = Object.fromEntries(
+              new FormData(event.target as HTMLFormElement).entries(),
             );
-    },
+
+            submissions.push({
+              method: props.method,
+              url: typeof props.action === 'string' ? props.action : '',
+              data: props.transform ? props.transform(fields) : fields,
+            });
+          },
+        },
+        slots.default?.(state),
+      );
+  },
 });
 
 /**
@@ -143,59 +129,56 @@ const Form = defineComponent({
  * on the returned object, and every submit method records what it was given.
  */
 function useForm<T extends Record<string, unknown>>(initial: T | (() => T)) {
-    const data = typeof initial === 'function' ? initial() : initial;
+  const data = typeof initial === 'function' ? initial() : initial;
 
-    let transformer: ((data: T) => Record<string, unknown>) | null = null;
+  let transformer: ((data: T) => Record<string, unknown>) | null = null;
 
-    const form = reactive({
-        ...data,
-        errors: {} as Record<string, string>,
-        processing: false,
-        hasErrors: false,
-        wasSuccessful: false,
-        recentlySuccessful: false,
-        transform(callback: (data: T) => Record<string, unknown>) {
-            transformer = callback;
+  const form = reactive({
+    ...data,
+    errors: {} as Record<string, string>,
+    processing: false,
+    hasErrors: false,
+    wasSuccessful: false,
+    recentlySuccessful: false,
+    transform(callback: (data: T) => Record<string, unknown>) {
+      transformer = callback;
 
-            return form;
-        },
-        reset() {
-            return form;
-        },
-        submit(method: string, url: string) {
-            const current = Object.fromEntries(
-                Object.keys(data).map((key) => [
-                    key,
-                    (form as Record<string, unknown>)[key],
-                ]),
-            ) as T;
+      return form;
+    },
+    reset() {
+      return form;
+    },
+    submit(method: string, url: string) {
+      const current = Object.fromEntries(
+        Object.keys(data).map((key) => [key, (form as Record<string, unknown>)[key]]),
+      ) as T;
 
-            submissions.push({
-                method,
-                url,
-                data: transformer ? transformer(current) : current,
-            });
+      submissions.push({
+        method,
+        url,
+        data: transformer ? transformer(current) : current,
+      });
 
-            return Promise.resolve();
-        },
-        get(url: string) {
-            return form.submit('get', url);
-        },
-        post(url: string) {
-            return form.submit('post', url);
-        },
-        put(url: string) {
-            return form.submit('put', url);
-        },
-        patch(url: string) {
-            return form.submit('patch', url);
-        },
-        delete(url: string) {
-            return form.submit('delete', url);
-        },
-    });
+      return Promise.resolve();
+    },
+    get(url: string) {
+      return form.submit('get', url);
+    },
+    post(url: string) {
+      return form.submit('post', url);
+    },
+    put(url: string) {
+      return form.submit('put', url);
+    },
+    patch(url: string) {
+      return form.submit('patch', url);
+    },
+    delete(url: string) {
+      return form.submit('delete', url);
+    },
+  });
 
-    return form;
+  return form;
 }
 
 /**
@@ -209,28 +192,28 @@ export const pageState = reactive({ url: '/' });
  * Returns whatever the current test put in pageProps.
  */
 function usePage() {
-    return {
-        props: pageProps,
-        get url() {
-            return pageState.url;
-        },
-        component: 'Test',
-        version: null,
-    };
+  return {
+    props: pageProps,
+    get url() {
+      return pageState.url;
+    },
+    component: 'Test',
+    version: null,
+  };
 }
 
 const router = {
-    visit: vi.fn(),
-    get: vi.fn((url: string, data: Record<string, unknown> = {}) => {
-        visits.push({ url, data });
-    }),
-    post: vi.fn(),
-    put: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-    reload: vi.fn(),
-    cancelAll: vi.fn(),
-    on: vi.fn(() => () => {}),
+  visit: vi.fn(),
+  get: vi.fn((url: string, data: Record<string, unknown> = {}) => {
+    visits.push({ url, data });
+  }),
+  post: vi.fn(),
+  put: vi.fn(),
+  patch: vi.fn(),
+  delete: vi.fn(),
+  reload: vi.fn(),
+  cancelAll: vi.fn(),
+  on: vi.fn(() => () => {}),
 };
 
 /**
@@ -245,47 +228,44 @@ export const httpResponse: { value: unknown } = { value: undefined };
  * useQuoteTotals.test.ts, which stubs this itself.
  */
 function useHttp<T extends Record<string, unknown>>(initial: T) {
-    let transformer: ((data: T) => unknown) | null = null;
+  let transformer: ((data: T) => unknown) | null = null;
 
-    const request = {
-        processing: false,
-        transform(callback: (data: T) => unknown) {
-            transformer = callback;
+  const request = {
+    processing: false,
+    transform(callback: (data: T) => unknown) {
+      transformer = callback;
 
-            return request;
-        },
-        post(url: string) {
-            submissions.push({
-                method: 'post',
-                url,
-                data: (transformer ? transformer(initial) : initial) as Record<
-                    string,
-                    unknown
-                >,
-            });
+      return request;
+    },
+    post(url: string) {
+      submissions.push({
+        method: 'post',
+        url,
+        data: (transformer ? transformer(initial) : initial) as Record<string, unknown>,
+      });
 
-            return Promise.resolve(httpResponse.value);
-        },
-    };
+      return Promise.resolve(httpResponse.value);
+    },
+  };
 
-    return request;
+  return request;
 }
 
 /**
  * The module shape handed to vi.mock.
  */
 export function inertiaStub() {
-    return { Head, Link, Form, useForm, useHttp, usePage, router };
+  return { Head, Link, Form, useForm, useHttp, usePage, router };
 }
 
 export function resetInertiaStub() {
-    submissions.length = 0;
-    visits.length = 0;
-    httpResponse.value = undefined;
-    pageProps.errors = {};
-    pageState.url = '/';
-    router.visit.mockClear();
-    router.get.mockClear();
-    router.post.mockClear();
-    router.delete.mockClear();
+  submissions.length = 0;
+  visits.length = 0;
+  httpResponse.value = undefined;
+  pageProps.errors = {};
+  pageState.url = '/';
+  router.visit.mockClear();
+  router.get.mockClear();
+  router.post.mockClear();
+  router.delete.mockClear();
 }

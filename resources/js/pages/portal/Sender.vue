@@ -11,20 +11,20 @@
  * is enough once one axis is definite.
  */
 defineProps<{
-    sender: { company_name: string | null; logo_url: string | null };
+  sender: { company_name: string | null; logo_url: string | null };
 }>();
 </script>
 
 <template>
-    <div>
-        <img
-            v-if="sender.logo_url"
-            :src="sender.logo_url"
-            :alt="sender.company_name ?? ''"
-            class="h-12 w-auto max-w-48 object-contain"
-        />
-        <p v-else-if="sender.company_name" class="font-medium">
-            {{ sender.company_name }}
-        </p>
-    </div>
+  <div>
+    <img
+      v-if="sender.logo_url"
+      :src="sender.logo_url"
+      :alt="sender.company_name ?? ''"
+      class="h-12 w-auto max-w-48 object-contain"
+    />
+    <p v-else-if="sender.company_name" class="font-medium">
+      {{ sender.company_name }}
+    </p>
+  </div>
 </template>

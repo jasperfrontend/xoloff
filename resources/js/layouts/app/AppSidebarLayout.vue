@@ -7,27 +7,27 @@ import { Toaster } from '@/components/ui/sonner';
 import type { BreadcrumbItem } from '@/types';
 
 type Props = {
-    breadcrumbs?: BreadcrumbItem[];
+  breadcrumbs?: BreadcrumbItem[];
 };
 
 withDefaults(defineProps<Props>(), {
-    breadcrumbs: () => [],
+  breadcrumbs: () => [],
 });
 </script>
 
 <template>
-    <AppShell variant="sidebar">
-        <AppSidebar />
-        <!--
+  <AppShell variant="sidebar">
+    <AppSidebar />
+    <!--
             Clip rather than hidden. Both keep a wide table from
             scrolling the page sideways, but hidden makes this element a
             scroll container, and position: sticky inside a scroll container
             that never scrolls simply does not stick.
         -->
-        <AppContent variant="sidebar" class="overflow-x-clip">
-            <AppSidebarHeader :breadcrumbs="breadcrumbs" />
-            <slot />
-        </AppContent>
-        <Toaster />
-    </AppShell>
+    <AppContent variant="sidebar" class="overflow-x-clip">
+      <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+      <slot />
+    </AppContent>
+    <Toaster />
+  </AppShell>
 </template>

@@ -4,12 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import type { QuoteStatus } from '@/types';
 
 const props = defineProps<{
-    status: QuoteStatus;
-    /**
-     * The wording comes from the server, so that the label a quote shows in
-     * the list and on its own screen can never disagree.
-     */
-    label: string;
+  status: QuoteStatus;
+  /**
+   * The wording comes from the server, so that the label a quote shows in
+   * the list and on its own screen can never disagree.
+   */
+  label: string;
 }>();
 
 /**
@@ -18,21 +18,18 @@ const props = defineProps<{
  * achievement; approval is the one thing worth being loud about.
  */
 const variant = computed(() => {
-    const variants: Record<
-        QuoteStatus,
-        'default' | 'secondary' | 'destructive' | 'outline'
-    > = {
-        draft: 'outline',
-        sent: 'secondary',
-        opened: 'secondary',
-        approved: 'default',
-        denied: 'destructive',
-    };
+  const variants: Record<QuoteStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    draft: 'outline',
+    sent: 'secondary',
+    opened: 'secondary',
+    approved: 'default',
+    denied: 'destructive',
+  };
 
-    return variants[props.status];
+  return variants[props.status];
 });
 </script>
 
 <template>
-    <Badge :variant="variant">{{ label }}</Badge>
+  <Badge :variant="variant">{{ label }}</Badge>
 </template>

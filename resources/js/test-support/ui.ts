@@ -10,50 +10,50 @@ import { defineComponent } from 'vue';
  * clicks an option.
  */
 function passthrough(name: string) {
-    return defineComponent({
-        name: `${name}Stub`,
-        setup:
-            (_, { slots }) =>
-            () =>
-                slots.default?.(),
-    });
+  return defineComponent({
+    name: `${name}Stub`,
+    setup:
+      (_, { slots }) =>
+      () =>
+        slots.default?.(),
+  });
 }
 
 export function selectStub() {
-    return {
-        Select: defineComponent({
-            name: 'SelectStub',
-            props: {
-                modelValue: { type: [String, Number], default: undefined },
-                defaultValue: { type: [String, Number], default: undefined },
-                name: { type: String, default: undefined },
-            },
-            emits: ['update:modelValue'],
-            setup:
-                (_, { slots }) =>
-                () =>
-                    slots.default?.(),
-        }),
-        SelectTrigger: passthrough('SelectTrigger'),
-        SelectValue: defineComponent({
-            name: 'SelectValueStub',
-            props: { placeholder: { type: String, default: '' } },
-            setup: (props) => () => props.placeholder,
-        }),
-        SelectContent: passthrough('SelectContent'),
-        SelectItem: defineComponent({
-            name: 'SelectItemStub',
-            props: { value: { type: [String, Number], default: '' } },
-            setup:
-                (_, { slots }) =>
-                () =>
-                    slots.default?.(),
-        }),
-        SelectGroup: passthrough('SelectGroup'),
-        SelectLabel: passthrough('SelectLabel'),
-        SelectSeparator: passthrough('SelectSeparator'),
-        SelectItemText: passthrough('SelectItemText'),
-        SelectScrollUpButton: passthrough('SelectScrollUpButton'),
-        SelectScrollDownButton: passthrough('SelectScrollDownButton'),
-    };
+  return {
+    Select: defineComponent({
+      name: 'SelectStub',
+      props: {
+        modelValue: { type: [String, Number], default: undefined },
+        defaultValue: { type: [String, Number], default: undefined },
+        name: { type: String, default: undefined },
+      },
+      emits: ['update:modelValue'],
+      setup:
+        (_, { slots }) =>
+        () =>
+          slots.default?.(),
+    }),
+    SelectTrigger: passthrough('SelectTrigger'),
+    SelectValue: defineComponent({
+      name: 'SelectValueStub',
+      props: { placeholder: { type: String, default: '' } },
+      setup: (props) => () => props.placeholder,
+    }),
+    SelectContent: passthrough('SelectContent'),
+    SelectItem: defineComponent({
+      name: 'SelectItemStub',
+      props: { value: { type: [String, Number], default: '' } },
+      setup:
+        (_, { slots }) =>
+        () =>
+          slots.default?.(),
+    }),
+    SelectGroup: passthrough('SelectGroup'),
+    SelectLabel: passthrough('SelectLabel'),
+    SelectSeparator: passthrough('SelectSeparator'),
+    SelectItemText: passthrough('SelectItemText'),
+    SelectScrollUpButton: passthrough('SelectScrollUpButton'),
+    SelectScrollDownButton: passthrough('SelectScrollDownButton'),
+  };
 }

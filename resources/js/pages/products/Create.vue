@@ -6,43 +6,43 @@ import ProductForm from '@/pages/products/Form.vue';
 import { create, index } from '@/routes/products';
 
 interface TaxClass {
-    id: number;
-    name: string;
-    percentage: string;
+  id: number;
+  name: string;
+  percentage: string;
 }
 
 interface Category {
-    id: number;
-    name: string;
+  id: number;
+  name: string;
 }
 
 defineProps<{ taxClasses: TaxClass[]; categories: Category[] }>();
 
 defineOptions({
-    layout: {
-        breadcrumbs: [
-            { title: 'Products', href: index() },
-            { title: 'New product', href: create() },
-        ],
-    },
+  layout: {
+    breadcrumbs: [
+      { title: 'Products', href: index() },
+      { title: 'New product', href: create() },
+    ],
+  },
 });
 </script>
 
 <template>
-    <Head title="New product" />
+  <Head title="New product" />
 
-    <div class="flex flex-col space-y-6 p-4">
-        <Heading
-            variant="small"
-            title="New product"
-            description="Catalog values act as defaults - every quote line stays editable"
-        />
+  <div class="flex flex-col space-y-6 p-4">
+    <Heading
+      variant="small"
+      title="New product"
+      description="Catalog values act as defaults - every quote line stays editable"
+    />
 
-        <ProductForm
-            :action="ProductController.store.form()"
-            :tax-classes="taxClasses"
-            :categories="categories"
-            submit-label="Create product"
-        />
-    </div>
+    <ProductForm
+      :action="ProductController.store.form()"
+      :tax-classes="taxClasses"
+      :categories="categories"
+      submit-label="Create product"
+    />
+  </div>
 </template>
