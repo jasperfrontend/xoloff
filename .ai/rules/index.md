@@ -7,3 +7,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/css/** | .ai/rules/css.md |
 | ** | .ai/rules/general.md |
 | resources/js/** | .ai/rules/js.md |
+| .github/workflows/** | .ai/rules/workflows.md |
