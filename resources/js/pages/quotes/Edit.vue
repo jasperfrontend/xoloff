@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import QuotePdfController from '@/actions/App/Http/Controllers/QuotePdfController';
 import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import Heading from '@/components/Heading.vue';
+import QuoteStatusBadge from '@/components/QuoteStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import QuoteForm from '@/pages/quotes/Form.vue';
 import { index, update } from '@/routes/quotes';
@@ -13,12 +14,15 @@ import type {
     CustomerOption,
     ProductOption,
     QuoteContent,
+    QuoteStatus,
     TaxClassOption,
 } from '@/types';
 
 interface Quote extends QuoteContent {
     id: number;
     customer_id: number | null;
+    status: QuoteStatus;
+    status_label: string;
     version_number: number;
     version_count: number;
 }
@@ -48,15 +52,22 @@ const pdfError = computed(() => page.props.errors?.pdf);
 
     <div class="flex flex-col space-y-6 p-4">
         <div class="flex items-start justify-between gap-4">
-            <Heading
-                variant="small"
-                :title="`Quote ${quote.id}`"
-                :description="
-                    quote.version_count > 1
-                        ? `Editing version ${quote.version_number} of ${quote.version_count}`
-                        : 'Saving overwrites this version unless you save as a new one'
-                "
-            />
+            <div class="flex items-start gap-3">
+                <Heading
+                    variant="small"
+                    :title="`Quote ${quote.id}`"
+                    :description="
+                        quote.version_count > 1
+                            ? `Editing version ${quote.version_number} of ${quote.version_count}`
+                            : 'Saving overwrites this version unless you save as a new one'
+                    "
+                />
+
+                <QuoteStatusBadge
+                    :status="quote.status"
+                    :label="quote.status_label"
+                />
+            </div>
 
             <div class="flex items-center gap-2">
                 <Button variant="secondary" as-child>

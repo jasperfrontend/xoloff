@@ -67,6 +67,8 @@ describe('quotes/Index', () => {
                     {
                         id: 1,
                         customer_name: 'Acme BV',
+                        status: 'draft' as const,
+                        status_label: 'Draft',
                         version_number: 2,
                         line_count: 3,
                         total: '217.80',
@@ -74,6 +76,8 @@ describe('quotes/Index', () => {
                     {
                         id: 2,
                         customer_name: 'Globex',
+                        status: 'draft' as const,
+                        status_label: 'Draft',
                         version_number: 1,
                         line_count: 1,
                         total: '12.10',
@@ -100,6 +104,8 @@ describe('quotes/Index', () => {
                     {
                         id: 1,
                         customer_name: 'Acme BV',
+                        status: 'draft' as const,
+                        status_label: 'Draft',
                         version_number: null,
                         line_count: 0,
                         total: '0.00',
@@ -111,6 +117,78 @@ describe('quotes/Index', () => {
         expect(wrapper.find('tbody tr').text()).toContain('-');
     });
 
+    /**
+     * Where a quote stands, at a glance (SPEC §3). The wording comes from the
+     * server so it cannot drift from the quote's own screen.
+     */
+    it('shows each quote where it stands', () => {
+        const wrapper = mount(QuoteIndex, {
+            props: {
+                quotes: [
+                    {
+                        id: 1,
+                        customer_name: 'Acme BV',
+                        status: 'sent' as const,
+                        status_label: 'Sent',
+                        version_number: 1,
+                        line_count: 1,
+                        total: '10.00',
+                    },
+                    {
+                        id: 2,
+                        customer_name: 'Globex',
+                        status: 'denied' as const,
+                        status_label: 'Denied',
+                        version_number: 1,
+                        line_count: 1,
+                        total: '10.00',
+                    },
+                ],
+            },
+        });
+
+        const rows = wrapper.findAll('tbody tr');
+
+        expect(rows[0].text()).toContain('Sent');
+        expect(rows[1].text()).toContain('Denied');
+    });
+
+    /**
+     * Only a denied quote is coloured as a problem. A draft is the ordinary
+     * resting state, so it must not read as one.
+     */
+    it('colours a denied quote as a problem and a draft as chrome', () => {
+        const wrapper = mount(QuoteIndex, {
+            props: {
+                quotes: [
+                    {
+                        id: 1,
+                        customer_name: 'Acme BV',
+                        status: 'draft' as const,
+                        status_label: 'Draft',
+                        version_number: 1,
+                        line_count: 1,
+                        total: '10.00',
+                    },
+                    {
+                        id: 2,
+                        customer_name: 'Globex',
+                        status: 'denied' as const,
+                        status_label: 'Denied',
+                        version_number: 1,
+                        line_count: 1,
+                        total: '10.00',
+                    },
+                ],
+            },
+        });
+
+        const badges = wrapper.findAll('[data-slot="badge"]');
+
+        expect(badges[0].classes()).not.toContain('bg-destructive');
+        expect(badges[1].classes()).toContain('bg-destructive');
+    });
+
     it('links each quote to its editor', () => {
         const wrapper = mount(QuoteIndex, {
             props: {
@@ -118,6 +196,8 @@ describe('quotes/Index', () => {
                     {
                         id: 42,
                         customer_name: 'Acme BV',
+                        status: 'draft' as const,
+                        status_label: 'Draft',
                         version_number: 1,
                         line_count: 1,
                         total: '10.00',
@@ -226,6 +306,8 @@ describe('quotes/Edit', () => {
     const quote = {
         id: 9,
         customer_id: 1,
+        status: 'draft' as const,
+        status_label: 'Draft',
         version_number: 2,
         version_count: 2,
         discount_type: null,
@@ -244,6 +326,18 @@ describe('quotes/Edit', () => {
         expect(form.props('submitMethod')).toBe('put');
         expect(form.props('quote')).toMatchObject({ id: 9 });
         expect(form.props('initialTotals')).toMatchObject({ total: '217.80' });
+    });
+
+    it('shows where the quote stands', () => {
+        const wrapper = mount(QuoteEdit, {
+            props: {
+                quote: { ...quote, status: 'opened', status_label: 'Opened' },
+                totals: totals(),
+                ...options,
+            },
+        });
+
+        expect(wrapper.find('[data-slot="badge"]').text()).toBe('Opened');
     });
 
     it('allows saving as a new version', () => {

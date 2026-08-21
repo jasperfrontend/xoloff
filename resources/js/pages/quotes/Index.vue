@@ -3,13 +3,17 @@ import { Head, Link } from '@inertiajs/vue3';
 import QuoteController from '@/actions/App/Http/Controllers/QuoteController';
 import QuoteVersionController from '@/actions/App/Http/Controllers/QuoteVersionController';
 import ConfirmDeleteButton from '@/components/ConfirmDeleteButton.vue';
+import QuoteStatusBadge from '@/components/QuoteStatusBadge.vue';
 import ResourceHeader from '@/components/ResourceHeader.vue';
 import { formatMoney } from '@/lib/money';
 import { index } from '@/routes/quotes';
+import type { QuoteStatus } from '@/types';
 
 interface Quote {
     id: number;
     customer_name: string;
+    status: QuoteStatus;
+    status_label: string;
     version_number: number | null;
     line_count: number;
     total: string;
@@ -41,6 +45,7 @@ defineOptions({
                     <tr>
                         <th class="px-4 py-3 font-medium">Quote</th>
                         <th class="px-4 py-3 font-medium">Customer</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
                         <th class="px-4 py-3 font-medium">Version</th>
                         <th class="px-4 py-3 font-medium">Lines</th>
                         <th class="px-4 py-3 font-medium">Total</th>
@@ -50,7 +55,7 @@ defineOptions({
                 <tbody>
                     <tr v-if="quotes.length === 0">
                         <td
-                            colspan="6"
+                            colspan="7"
                             class="px-4 py-8 text-center text-foreground"
                         >
                             No quotes yet.
@@ -71,6 +76,12 @@ defineOptions({
                         </td>
                         <td class="px-4 py-3 text-foreground">
                             {{ quote.customer_name }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <QuoteStatusBadge
+                                :status="quote.status"
+                                :label="quote.status_label"
+                            />
                         </td>
                         <td class="px-4 py-3 tabular-nums">
                             <Link

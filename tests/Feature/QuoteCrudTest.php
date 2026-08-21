@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\DiscountType;
+use App\Enums\QuoteStatus;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Quote;
@@ -39,6 +40,80 @@ class QuoteCrudTest extends TestCase
                 ->where('quotes.0.version_number', 1)
                 ->where('quotes.0.line_count', 1),
             );
+    }
+
+    /**
+     * SPEC §3 names draft the implicit default. It is a real stored value
+     * rather than an absence, so nothing downstream has to treat null as if
+     * it meant something.
+     */
+    public function test_a_new_quote_starts_as_a_draft()
+    {
+        $this->actingAs(User::factory()->create())
+            ->post(route('quotes.store'), [
+                'customer_id' => Customer::factory()->create()->id,
+                'line_items' => [],
+            ]);
+
+        $this->assertSame(QuoteStatus::Draft, Quote::sole()->status);
+    }
+
+    public function test_the_index_shows_where_each_quote_stands()
+    {
+        QuoteVersion::factory()->for(Quote::factory()->sent())->create();
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('quotes.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('quotes.0.status', 'sent')
+                ->where('quotes.0.status_label', 'Sent'),
+            );
+    }
+
+    public function test_the_edit_page_shows_where_the_quote_stands()
+    {
+        $quote = Quote::factory()->sent()->create();
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('quotes.edit', $quote))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('quote.status', 'sent')
+                ->where('quote.status_label', 'Sent'),
+            );
+    }
+
+    /**
+     * Status moves through the actions that cause it, never through a form
+     * post, so a request that names one is ignored rather than obeyed.
+     */
+    public function test_a_request_cannot_nominate_a_status()
+    {
+        $quote = Quote::factory()->create();
+
+        $this->actingAs(User::factory()->create())
+            ->put(route('quotes.update', $quote), [
+                'customer_id' => $quote->customer_id,
+                'status' => QuoteStatus::Approved->value,
+                'line_items' => [],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(QuoteStatus::Draft, $quote->fresh()->status);
+    }
+
+    /**
+     * The request above is refused twice over, and this is the half that
+     * holds regardless of which screen does the saving: nothing reaches
+     * status through a filled array, so a controller written later that
+     * passes a whole request through cannot open the hole by accident.
+     */
+    public function test_status_is_not_mass_assignable()
+    {
+        $quote = Quote::factory()->create();
+
+        $quote->update(['status' => QuoteStatus::Approved]);
+
+        $this->assertSame(QuoteStatus::Draft, $quote->fresh()->status);
     }
 
     public function test_the_builder_offers_customers_products_and_tax_classes()

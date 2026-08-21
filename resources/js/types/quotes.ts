@@ -1,3 +1,6 @@
+/** Mirrors App\Enums\QuoteStatus. */
+export type QuoteStatus = 'draft' | 'sent' | 'opened' | 'approved' | 'denied';
+
 export type DiscountType = 'percentage' | 'fixed';
 
 export interface QuoteLineItem {

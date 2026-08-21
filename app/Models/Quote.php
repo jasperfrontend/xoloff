@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\RecordsItsOwnChanges;
 use App\Contracts\DescribesItselfForAudit;
+use App\Enums\QuoteStatus;
 use Database\Factories\QuoteFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property int $id
  * @property int $customer_id
+ * @property QuoteStatus $status
  * @property-read Customer $customer
  * @property-read QuoteVersion|null $currentVersion
  */
@@ -25,6 +27,20 @@ class Quote extends Model implements DescribesItselfForAudit
     protected $fillable = [
         'customer_id',
     ];
+
+    /**
+     * Status is deliberately not fillable. It moves through the actions that
+     * cause it - sending, opening, approving - and never through a form post,
+     * so no request can nominate one.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => QuoteStatus::class,
+        ];
+    }
 
     public function auditLabel(): string
     {

@@ -33,6 +33,11 @@ class QuoteController extends Controller
             'quotes' => $quotes->map(fn (Quote $quote): array => [
                 'id' => $quote->id,
                 'customer_name' => $quote->customer->company_name,
+                'status' => $quote->status->value,
+                // Sent alongside the value rather than translated in the page,
+                // so the wording cannot drift between here and the quote's own
+                // screen.
+                'status_label' => $quote->status->label(),
                 'version_number' => $quote->currentVersion?->version_number,
                 'line_count' => $quote->currentVersion?->lineItems->count() ?? 0,
                 'total' => $quote->currentVersion === null
@@ -77,6 +82,8 @@ class QuoteController extends Controller
             'quote' => [
                 'id' => $quote->id,
                 'customer_id' => $quote->customer_id,
+                'status' => $quote->status->value,
+                'status_label' => $quote->status->label(),
                 'version_number' => $version->version_number ?? 1,
                 'version_count' => $quote->versions()->count(),
                 'discount_type' => $version?->discount_type,
