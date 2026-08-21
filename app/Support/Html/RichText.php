@@ -39,8 +39,13 @@ final class RichText
 
     /**
      * The only attribute that survives, and only on a link.
+     *
+     * tel is here because a quote footer carries a phone number and someone
+     * reading it on a phone should be able to press it. It cannot execute: a
+     * browser hands it to whatever answers for calls, the same way it hands
+     * mailto to a mail client.
      */
-    private const ALLOWED_LINK_SCHEMES = ['http', 'https', 'mailto'];
+    private const ALLOWED_LINK_SCHEMES = ['http', 'https', 'mailto', 'tel'];
 
     public static function sanitize(string $html): string
     {
@@ -100,6 +105,15 @@ final class RichText
             }
 
             self::stripAttributes($child, $tag);
+
+            // A link whose address was refused is not a link any more, and
+            // leaving the element behind is worse than removing it: the quote
+            // template colours every `a` with the accent colour, so the text
+            // stays looking clickable and does nothing. That is how a stripped
+            // tel: went unnoticed - the phone number stayed green.
+            if ($tag === 'a' && ! $child->hasAttribute('href')) {
+                self::unwrap($child);
+            }
         }
     }
 

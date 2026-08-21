@@ -159,6 +159,26 @@ describe('RichTextEditor', () => {
         expect(latestValue(wrapper)).toContain('href="https://xolution.nl"');
     });
 
+    /**
+     * A quote footer carries a phone number, and the sanitiser on the way in
+     * accepts tel. This end has to agree, or what the person sees is a link
+     * that silently is not one.
+     *
+     * No configuration backs this up: TipTap allows tel as it stands, and
+     * adding protocols: ['tel'] changed nothing when tried. This test is the
+     * thing that will notice if an upgrade ever tightens that.
+     */
+    it('accepts a phone number as a link', async () => {
+        const wrapper = build();
+        vi.spyOn(window, 'prompt').mockReturnValue('tel:0031307115733');
+
+        editorOf(wrapper).commands.selectAll();
+        await wrapper.find('button[aria-label="Link"]').trigger('click');
+        await settle(wrapper);
+
+        expect(latestValue(wrapper)).toContain('href="tel:0031307115733"');
+    });
+
     it('leaves the text alone when the address is not given', async () => {
         const wrapper = build();
 

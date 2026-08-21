@@ -64,6 +64,11 @@ class RichTextTest extends TestCase
      * The link text is deliberately kept when the address is refused: dropping
      * the whole element would silently delete a sentence.
      *
+     * The element itself goes, though. The quote template colours every `a`
+     * with the accent colour, so an anchor left behind without an address
+     * reads as a link and does nothing - which is exactly how a stripped tel:
+     * hid for as long as it did.
+     *
      * @param  non-empty-string  $href
      */
     #[DataProvider('unsafeLinks')]
@@ -71,8 +76,7 @@ class RichTextTest extends TestCase
     {
         $sanitized = RichText::sanitize('<p><a href="'.$href.'">Klik</a></p>');
 
-        $this->assertStringNotContainsString('href', $sanitized);
-        $this->assertStringContainsString('Klik', $sanitized);
+        $this->assertSame('<p>Klik</p>', $sanitized);
     }
 
     /**
@@ -118,6 +122,10 @@ class RichTextTest extends TestCase
             'https' => ['https://xolution.nl/voorwaarden'],
             'http' => ['http://xolution.nl'],
             'mailto' => ['mailto:stephan@xolution.nl'],
+            // A footer carries a phone number, and someone reading a quote on
+            // a phone should be able to press it.
+            'tel' => ['tel:0031307115733'],
+            'tel with spaces' => ['tel:030 711 5733'],
             'relative path' => ['/voorwaarden.pdf'],
         ];
     }
