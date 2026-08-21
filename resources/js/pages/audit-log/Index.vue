@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ChevronDown } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,13 +65,20 @@ const action = ref(props.filters.action ?? ANY);
 const from = ref(props.filters.from ?? '');
 const to = ref(props.filters.to ?? '');
 
+/**
+ * Read from what the server actually filtered on, not from the inputs.
+ *
+ * Computed from the local refs it would appear the instant a select changed,
+ * offering to clear filters that had not been applied yet - which was the
+ * wrong way round, since applying happens on change now anyway.
+ */
 const hasFilters = computed(
     () =>
-        quoteId.value !== ANY ||
-        userId.value !== ANY ||
-        action.value !== ANY ||
-        from.value !== '' ||
-        to.value !== '',
+        props.filters.quote_id !== null ||
+        props.filters.user_id !== null ||
+        props.filters.action !== null ||
+        props.filters.from !== null ||
+        props.filters.to !== null,
 );
 
 function apply() {
@@ -96,6 +103,22 @@ function clear() {
     to.value = '';
     apply();
 }
+
+/**
+ * Applied as they change rather than behind a button. A filter that has been
+ * chosen but not yet applied is a screen showing something other than what it
+ * says it is showing.
+ *
+ * Dates fire this on every keystroke while a date input is being typed into,
+ * so the visit is debounced. Selects settle immediately and are unaffected.
+ */
+let dateChange: number | undefined;
+
+watch([quoteId, userId, action], () => apply());
+watch([from, to], () => {
+    clearTimeout(dateChange);
+    dateChange = window.setTimeout(apply, 400);
+});
 
 const expanded = ref<number | null>(null);
 
@@ -209,7 +232,6 @@ function pageLabel(label: string): string {
             </div>
 
             <div class="flex items-center gap-3">
-                <Button class="cursor-pointer" @click="apply">Apply</Button>
                 <Button
                     v-if="hasFilters"
                     variant="ghost"

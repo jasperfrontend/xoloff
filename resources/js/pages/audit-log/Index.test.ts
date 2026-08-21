@@ -64,13 +64,6 @@ function chooseInSelect(wrapper: VueWrapper, index: number, value: string) {
         [index].vm.$emit('update:modelValue', value);
 }
 
-function apply(wrapper: VueWrapper) {
-    return wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Apply')!
-        .trigger('click');
-}
-
 describe('audit-log/Index', () => {
     beforeEach(() => {
         resetInertiaStub();
@@ -114,52 +107,93 @@ describe('audit-log/Index', () => {
         expect(wrapper.find('pre').text()).toContain('"from": "A"');
     });
 
-    it('asks the server for the filtered log', async () => {
+    /**
+     * Applied as they change rather than behind a button. A filter chosen but
+     * not yet applied is a screen showing something other than what it says it
+     * is showing.
+     */
+    it('asks the server as soon as a filter changes', async () => {
         const wrapper = build();
 
         // Select order: quote, who, what.
         await chooseInSelect(wrapper, 0, '9');
-        await chooseInSelect(wrapper, 2, 'exported');
-        await wrapper.find('#from').setValue('2026-08-01');
         await wrapper.vm.$nextTick();
 
-        await apply(wrapper);
+        expect(visits).toHaveLength(1);
+        expect(visits[0].data).toEqual({ quote_id: '9' });
 
-        expect(visits[0].data).toEqual({
-            quote_id: '9',
-            action: 'exported',
-            from: '2026-08-01',
-        });
+        await chooseInSelect(wrapper, 2, 'exported');
+        await wrapper.vm.$nextTick();
+
+        expect(visits[1].data).toEqual({ quote_id: '9', action: 'exported' });
     });
 
     /**
-     * An empty string cannot be a select value and still show a placeholder, so
-     * "any" stands in for it. It must never reach the server as a filter.
+     * An empty string cannot be a select value and still show a placeholder,
+     * so "any" stands in for it. It must never reach the server as a filter.
      */
     it('does not send a filter that was left at any', async () => {
         const wrapper = build();
 
-        await apply(wrapper);
-
-        expect(visits[0].data).toEqual({});
-    });
-
-    it('offers to clear the filters only when some are set', async () => {
-        const wrapper = build();
-
-        const clearButton = () =>
-            wrapper.findAll('button').find((b) => b.text() === 'Clear filters');
-
-        expect(clearButton()).toBeUndefined();
-
         await chooseInSelect(wrapper, 0, '9');
         await wrapper.vm.$nextTick();
 
-        expect(clearButton()).toBeDefined();
+        expect(visits[0].data).toEqual({ quote_id: '9' });
+        expect(visits[0].data).not.toHaveProperty('user_id');
+        expect(visits[0].data).not.toHaveProperty('action');
+    });
 
-        await clearButton()!.trigger('click');
+    /**
+     * A date input fires on every keystroke while a date is being typed, so
+     * the visit waits for the typing to stop. Without this a half-typed year
+     * would be sent as a filter.
+     */
+    it('waits for a date to be finished before asking', async () => {
+        vi.useFakeTimers();
 
-        expect(visits[0].data).toEqual({});
+        try {
+            const wrapper = build();
+
+            await wrapper.find('#from').setValue('2026-08-01');
+            await wrapper.vm.$nextTick();
+
+            expect(visits).toHaveLength(0);
+
+            vi.advanceTimersByTime(400);
+            await wrapper.vm.$nextTick();
+
+            expect(visits[0].data).toEqual({ from: '2026-08-01' });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    /**
+     * Read from what the server actually filtered on, not from the inputs.
+     * Computed from the inputs it appeared the instant a select changed,
+     * offering to clear filters that were not in effect yet.
+     */
+    it('offers to clear the filters only once some are in effect', async () => {
+        const clearButton = (wrapper: VueWrapper) =>
+            wrapper.findAll('button').find((b) => b.text() === 'Clear filters');
+
+        expect(clearButton(build())).toBeUndefined();
+
+        const filtered = build({
+            filters: {
+                quote_id: 9,
+                user_id: null,
+                action: null,
+                from: null,
+                to: null,
+            },
+        });
+
+        expect(clearButton(filtered)).toBeDefined();
+
+        await clearButton(filtered)!.trigger('click');
+
+        expect(visits[visits.length - 1].data).toEqual({});
     });
 
     it('opens with the filters the server was given', () => {
