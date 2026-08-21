@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useQuoteTotals } from '@/composables/useQuoteTotals';
-import { formatMoney, formatPercentage, normalizeAmount } from '@/lib/money';
+import { formatMoney, formatTaxRate, normalizeAmount } from '@/lib/money';
 import QuoteTotals from '@/pages/quotes/Totals.vue';
 import { index, preview } from '@/routes/quotes';
 import type {
@@ -65,6 +65,11 @@ const props = defineProps<{
     quote?: QuoteFormData;
     initialTotals?: CalculatedQuote | null;
     submitLabel: string;
+    /**
+     * A quote the customer has answered is finished. The server refuses every
+     * change to one; this is so the screen stops inviting them.
+     */
+    readOnly?: boolean;
     submitUrl: string;
     submitMethod: 'post' | 'put';
     newVersionUrl?: string;
@@ -237,413 +242,444 @@ function saveAsNewVersion() {
 
 <template>
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <!--
+            A fieldset rather than a disabled attribute on each input: it
+            covers every control inside it, including ones added later, and it
+            is what a browser already understands.
+        -->
         <form class="space-y-6" @submit.prevent="submit">
-            <div class="grid max-w-md gap-2">
-                <Label for="customer_id">Customer</Label>
-                <Select
-                    :model-value="form.customer_id?.toString()"
-                    @update:model-value="form.customer_id = Number($event)"
-                >
-                    <SelectTrigger id="customer_id" class="cursor-pointer">
-                        <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem
-                            v-for="customer in customers"
-                            :key="customer.id"
-                            :value="customer.id.toString()"
-                            class="cursor-pointer"
-                        >
-                            {{ customer.company_name }}
-                        </SelectItem>
-                    </SelectContent>
-                </Select>
-                <InputError :message="form.errors.customer_id" />
-            </div>
-
-            <div class="grid gap-3 rounded-xl border p-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <Label>Line items</Label>
-                        <p class="text-xs text-foreground">
-                            Pick a product to fill the line, then edit anything
-                            you like. Catalog values are only defaults.
-                        </p>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        class="cursor-pointer"
-                        @click="addLineItem"
-                    >
-                        <Plus class="size-4" />
-                        Add line
-                    </Button>
-                </div>
-
-                <p
-                    v-if="form.line_items.length === 0"
-                    class="text-sm text-foreground"
-                >
-                    No lines yet. An empty quote is a perfectly good draft.
-                </p>
-
-                <div
-                    v-for="(lineItem, lineIndex) in form.line_items"
-                    :key="lineIndex"
-                    class="grid gap-3 rounded-lg border p-3"
-                >
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="grid flex-1 gap-2">
-                            <Label :for="`line-${lineIndex}-product`">
-                                Insert from catalog
-                            </Label>
-                            <Select
-                                :model-value="lineItem.product_id?.toString()"
-                                @update:model-value="
-                                    applyProduct(lineItem, String($event))
-                                "
-                            >
-                                <SelectTrigger
-                                    :id="`line-${lineIndex}-product`"
-                                    class="cursor-pointer"
-                                >
-                                    <SelectValue
-                                        placeholder="Start from a blank line"
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="product in products"
-                                        :key="product.id"
-                                        :value="product.id.toString()"
-                                        class="cursor-pointer"
-                                    >
-                                        {{ product.name }}
-                                        ({{
-                                            formatMoney(product.price_ex_vat)
-                                        }})
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            class="mt-6 cursor-pointer"
-                            aria-label="Remove line"
-                            @click="removeLineItem(lineIndex)"
-                        >
-                            <X class="size-4" />
-                        </Button>
-                    </div>
-
-                    <div class="grid gap-2">
-                        <Label :for="`line-${lineIndex}-name`"
-                            >Description</Label
-                        >
-                        <Input
-                            :id="`line-${lineIndex}-name`"
-                            v-model="lineItem.name"
-                            required
-                        />
-                        <InputError
-                            :message="
-                                form.errors[`line_items.${lineIndex}.name`]
-                            "
-                        />
-                    </div>
-
-                    <div class="grid gap-3 sm:grid-cols-3">
-                        <div class="grid gap-2">
-                            <Label :for="`line-${lineIndex}-quantity`"
-                                >Quantity</Label
-                            >
-                            <Input
-                                :id="`line-${lineIndex}-quantity`"
-                                v-model="lineItem.quantity"
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                required
-                            />
-                            <InputError
-                                :message="
-                                    form.errors[
-                                        `line_items.${lineIndex}.quantity`
-                                    ]
-                                "
-                            />
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label :for="`line-${lineIndex}-price`"
-                                >Unit price ex. VAT</Label
-                            >
-                            <Input
-                                :id="`line-${lineIndex}-price`"
-                                v-model="lineItem.unit_price_ex_vat"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                @blur="
-                                    settleLineAmount(
-                                        lineItem,
-                                        'unit_price_ex_vat',
-                                    )
-                                "
-                            />
-                            <InputError
-                                :message="
-                                    form.errors[
-                                        `line_items.${lineIndex}.unit_price_ex_vat`
-                                    ]
-                                "
-                            />
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label :for="`line-${lineIndex}-tax`"
-                                >Tax class</Label
-                            >
-                            <Select
-                                :model-value="lineItem.tax_class_id?.toString()"
-                                @update:model-value="
-                                    lineItem.tax_class_id = Number($event)
-                                "
-                            >
-                                <SelectTrigger
-                                    :id="`line-${lineIndex}-tax`"
-                                    class="cursor-pointer"
-                                >
-                                    <SelectValue placeholder="Select" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        v-for="taxClass in taxClasses"
-                                        :key="taxClass.id"
-                                        :value="taxClass.id.toString()"
-                                        class="cursor-pointer"
-                                    >
-                                        {{ taxClass.name }}
-                                        ({{
-                                            formatPercentage(
-                                                taxClass.percentage,
-                                            )
-                                        }})
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <InputError
-                                :message="
-                                    form.errors[
-                                        `line_items.${lineIndex}.tax_class_id`
-                                    ]
-                                "
-                            />
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 sm:grid-cols-2">
-                        <div class="grid gap-2">
-                            <Label :for="`line-${lineIndex}-discount-type`"
-                                >Line discount</Label
-                            >
-                            <Select
-                                :model-value="lineItem.discount_type ?? 'none'"
-                                @update:model-value="
-                                    lineItem.discount_type =
-                                        $event === 'none'
-                                            ? null
-                                            : ($event as
-                                                  'percentage' | 'fixed');
-                                    clearDiscount(lineItem);
-                                "
-                            >
-                                <SelectTrigger
-                                    :id="`line-${lineIndex}-discount-type`"
-                                    class="cursor-pointer"
-                                >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem
-                                        value="none"
-                                        class="cursor-pointer"
-                                    >
-                                        No discount
-                                    </SelectItem>
-                                    <SelectItem
-                                        value="percentage"
-                                        class="cursor-pointer"
-                                    >
-                                        Percentage
-                                    </SelectItem>
-                                    <SelectItem
-                                        value="fixed"
-                                        class="cursor-pointer"
-                                    >
-                                        Fixed amount
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div v-if="lineItem.discount_type" class="grid gap-2">
-                            <Label :for="`line-${lineIndex}-discount-value`">
-                                {{
-                                    lineItem.discount_type === 'percentage'
-                                        ? 'Percentage'
-                                        : 'Amount'
-                                }}
-                            </Label>
-                            <Input
-                                :id="`line-${lineIndex}-discount-value`"
-                                v-model="lineItem.discount_value"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                :max="
-                                    lineItem.discount_type === 'percentage'
-                                        ? 100
-                                        : undefined
-                                "
-                                @blur="
-                                    settleLineAmount(lineItem, 'discount_value')
-                                "
-                            />
-                            <InputError
-                                :message="
-                                    errorFor(
-                                        `line_items.${lineIndex}.discount_value`,
-                                    )
-                                "
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
-                <div class="grid gap-2">
-                    <Label for="discount_type">Quote discount</Label>
+            <fieldset :disabled="readOnly" class="space-y-6">
+                <div class="grid max-w-md gap-2">
+                    <Label for="customer_id">Customer</Label>
                     <Select
-                        :model-value="form.discount_type ?? 'none'"
-                        @update:model-value="
-                            form.discount_type =
-                                $event === 'none'
-                                    ? null
-                                    : ($event as 'percentage' | 'fixed');
-                            clearDiscount(form);
-                        "
+                        :model-value="form.customer_id?.toString()"
+                        @update:model-value="form.customer_id = Number($event)"
                     >
-                        <SelectTrigger
-                            id="discount_type"
-                            class="cursor-pointer"
-                        >
-                            <SelectValue />
+                        <SelectTrigger id="customer_id" class="cursor-pointer">
+                            <SelectValue placeholder="Select a customer" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="none" class="cursor-pointer">
-                                No discount
-                            </SelectItem>
                             <SelectItem
-                                value="percentage"
+                                v-for="customer in customers"
+                                :key="customer.id"
+                                :value="customer.id.toString()"
                                 class="cursor-pointer"
                             >
-                                Percentage
-                            </SelectItem>
-                            <SelectItem value="fixed" class="cursor-pointer">
-                                Fixed amount
+                                {{ customer.company_name }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <p class="text-xs text-foreground">
-                        Applied before VAT and split across the lines in
-                        proportion to their value.
+                    <InputError :message="form.errors.customer_id" />
+                </div>
+
+                <div class="grid gap-3 rounded-xl border p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <Label>Line items</Label>
+                            <p class="text-xs text-foreground">
+                                Pick a product to fill the line, then edit
+                                anything you like. Catalog values are only
+                                defaults.
+                            </p>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            class="cursor-pointer"
+                            @click="addLineItem"
+                        >
+                            <Plus class="size-4" />
+                            Add line
+                        </Button>
+                    </div>
+
+                    <p
+                        v-if="form.line_items.length === 0"
+                        class="text-sm text-foreground"
+                    >
+                        No lines yet. An empty quote is a perfectly good draft.
                     </p>
+
+                    <div
+                        v-for="(lineItem, lineIndex) in form.line_items"
+                        :key="lineIndex"
+                        class="grid gap-3 rounded-lg border p-3"
+                    >
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="grid flex-1 gap-2">
+                                <Label :for="`line-${lineIndex}-product`">
+                                    Insert from catalog
+                                </Label>
+                                <Select
+                                    :model-value="
+                                        lineItem.product_id?.toString()
+                                    "
+                                    @update:model-value="
+                                        applyProduct(lineItem, String($event))
+                                    "
+                                >
+                                    <SelectTrigger
+                                        :id="`line-${lineIndex}-product`"
+                                        class="cursor-pointer"
+                                    >
+                                        <SelectValue
+                                            placeholder="Start from a blank line"
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            v-for="product in products"
+                                            :key="product.id"
+                                            :value="product.id.toString()"
+                                            class="cursor-pointer"
+                                        >
+                                            {{ product.name }}
+                                            ({{
+                                                formatMoney(
+                                                    product.price_ex_vat,
+                                                )
+                                            }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                class="mt-6 cursor-pointer"
+                                aria-label="Remove line"
+                                @click="removeLineItem(lineIndex)"
+                            >
+                                <X class="size-4" />
+                            </Button>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label :for="`line-${lineIndex}-name`"
+                                >Description</Label
+                            >
+                            <Input
+                                :id="`line-${lineIndex}-name`"
+                                v-model="lineItem.name"
+                                required
+                            />
+                            <InputError
+                                :message="
+                                    form.errors[`line_items.${lineIndex}.name`]
+                                "
+                            />
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="grid gap-2">
+                                <Label :for="`line-${lineIndex}-quantity`"
+                                    >Quantity</Label
+                                >
+                                <Input
+                                    :id="`line-${lineIndex}-quantity`"
+                                    v-model="lineItem.quantity"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    required
+                                />
+                                <InputError
+                                    :message="
+                                        form.errors[
+                                            `line_items.${lineIndex}.quantity`
+                                        ]
+                                    "
+                                />
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label :for="`line-${lineIndex}-price`"
+                                    >Unit price ex. VAT</Label
+                                >
+                                <Input
+                                    :id="`line-${lineIndex}-price`"
+                                    v-model="lineItem.unit_price_ex_vat"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                    @blur="
+                                        settleLineAmount(
+                                            lineItem,
+                                            'unit_price_ex_vat',
+                                        )
+                                    "
+                                />
+                                <InputError
+                                    :message="
+                                        form.errors[
+                                            `line_items.${lineIndex}.unit_price_ex_vat`
+                                        ]
+                                    "
+                                />
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label :for="`line-${lineIndex}-tax`"
+                                    >Tax class</Label
+                                >
+                                <Select
+                                    :model-value="
+                                        lineItem.tax_class_id?.toString()
+                                    "
+                                    @update:model-value="
+                                        lineItem.tax_class_id = Number($event)
+                                    "
+                                >
+                                    <SelectTrigger
+                                        :id="`line-${lineIndex}-tax`"
+                                        class="cursor-pointer"
+                                    >
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            v-for="taxClass in taxClasses"
+                                            :key="taxClass.id"
+                                            :value="taxClass.id.toString()"
+                                            class="cursor-pointer"
+                                        >
+                                            {{ taxClass.name }}
+                                            ({{
+                                                formatTaxRate(
+                                                    taxClass.percentage,
+                                                )
+                                            }})
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError
+                                    :message="
+                                        form.errors[
+                                            `line_items.${lineIndex}.tax_class_id`
+                                        ]
+                                    "
+                                />
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="grid gap-2">
+                                <Label :for="`line-${lineIndex}-discount-type`"
+                                    >Line discount</Label
+                                >
+                                <Select
+                                    :model-value="
+                                        lineItem.discount_type ?? 'none'
+                                    "
+                                    @update:model-value="
+                                        lineItem.discount_type =
+                                            $event === 'none'
+                                                ? null
+                                                : ($event as
+                                                      'percentage' | 'fixed');
+                                        clearDiscount(lineItem);
+                                    "
+                                >
+                                    <SelectTrigger
+                                        :id="`line-${lineIndex}-discount-type`"
+                                        class="cursor-pointer"
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            value="none"
+                                            class="cursor-pointer"
+                                        >
+                                            No discount
+                                        </SelectItem>
+                                        <SelectItem
+                                            value="percentage"
+                                            class="cursor-pointer"
+                                        >
+                                            Percentage
+                                        </SelectItem>
+                                        <SelectItem
+                                            value="fixed"
+                                            class="cursor-pointer"
+                                        >
+                                            Fixed amount
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div
+                                v-if="lineItem.discount_type"
+                                class="grid gap-2"
+                            >
+                                <Label
+                                    :for="`line-${lineIndex}-discount-value`"
+                                >
+                                    {{
+                                        lineItem.discount_type === 'percentage'
+                                            ? 'Percentage'
+                                            : 'Amount'
+                                    }}
+                                </Label>
+                                <Input
+                                    :id="`line-${lineIndex}-discount-value`"
+                                    v-model="lineItem.discount_value"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    :max="
+                                        lineItem.discount_type === 'percentage'
+                                            ? 100
+                                            : undefined
+                                    "
+                                    @blur="
+                                        settleLineAmount(
+                                            lineItem,
+                                            'discount_value',
+                                        )
+                                    "
+                                />
+                                <InputError
+                                    :message="
+                                        errorFor(
+                                            `line_items.${lineIndex}.discount_value`,
+                                        )
+                                    "
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div v-if="form.discount_type" class="grid gap-2">
-                    <Label for="discount_value">
-                        {{
-                            form.discount_type === 'percentage'
-                                ? 'Percentage'
-                                : 'Amount'
-                        }}
-                    </Label>
-                    <Input
-                        id="discount_value"
-                        v-model="form.discount_value"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        :max="
-                            form.discount_type === 'percentage'
-                                ? 100
-                                : undefined
-                        "
-                        @blur="settleQuoteAmount('discount_value')"
-                    />
-                    <InputError :message="errorFor('discount_value')" />
-                </div>
-            </div>
+                <div class="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="discount_type">Quote discount</Label>
+                        <Select
+                            :model-value="form.discount_type ?? 'none'"
+                            @update:model-value="
+                                form.discount_type =
+                                    $event === 'none'
+                                        ? null
+                                        : ($event as 'percentage' | 'fixed');
+                                clearDiscount(form);
+                            "
+                        >
+                            <SelectTrigger
+                                id="discount_type"
+                                class="cursor-pointer"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none" class="cursor-pointer">
+                                    No discount
+                                </SelectItem>
+                                <SelectItem
+                                    value="percentage"
+                                    class="cursor-pointer"
+                                >
+                                    Percentage
+                                </SelectItem>
+                                <SelectItem
+                                    value="fixed"
+                                    class="cursor-pointer"
+                                >
+                                    Fixed amount
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="text-xs text-foreground">
+                            Applied before VAT and split across the lines in
+                            proportion to their value.
+                        </p>
+                    </div>
 
-            <!--
+                    <div v-if="form.discount_type" class="grid gap-2">
+                        <Label for="discount_value">
+                            {{
+                                form.discount_type === 'percentage'
+                                    ? 'Percentage'
+                                    : 'Amount'
+                            }}
+                        </Label>
+                        <Input
+                            id="discount_value"
+                            v-model="form.discount_value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            :max="
+                                form.discount_type === 'percentage'
+                                    ? 100
+                                    : undefined
+                            "
+                            @blur="settleQuoteAmount('discount_value')"
+                        />
+                        <InputError :message="errorFor('discount_value')" />
+                    </div>
+                </div>
+
+                <!--
                 A card of its own, deliberately. Sharing a grid with the quote
                 discount meant this input moved as soon as a discount type was
                 chosen and its amount field appeared, leaving two number inputs
                 whose owners were not obvious.
             -->
-            <div class="grid max-w-md gap-3 rounded-xl border p-4">
-                <div class="grid gap-2">
-                    <Label for="rounding_override">Rounding override</Label>
-                    <Input
-                        id="rounding_override"
-                        v-model="form.rounding_override"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Leave empty to use the calculated total"
-                        @blur="settleQuoteAmount('rounding_override')"
-                    />
-                    <p class="text-xs text-foreground">
-                        Replaces the total outright. There is no reconciliation
-                        line and the calculated total is not shown to the
-                        customer.
-                    </p>
-                    <InputError :message="errorFor('rounding_override')" />
+                <div class="grid max-w-md gap-3 rounded-xl border p-4">
+                    <div class="grid gap-2">
+                        <Label for="rounding_override">Rounding override</Label>
+                        <Input
+                            id="rounding_override"
+                            v-model="form.rounding_override"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Leave empty to use the calculated total"
+                            @blur="settleQuoteAmount('rounding_override')"
+                        />
+                        <p class="text-xs text-foreground">
+                            Replaces the total outright. There is no
+                            reconciliation line and the calculated total is not
+                            shown to the customer.
+                        </p>
+                        <InputError :message="errorFor('rounding_override')" />
+                    </div>
                 </div>
-            </div>
 
-            <div class="flex items-center gap-4">
-                <Button
-                    type="submit"
-                    class="cursor-pointer"
-                    :disabled="form.processing"
-                >
-                    {{ submitLabel }}
-                </Button>
+                <div class="flex items-center gap-4">
+                    <template v-if="!readOnly">
+                        <Button
+                            type="submit"
+                            class="cursor-pointer"
+                            :disabled="form.processing"
+                        >
+                            {{ submitLabel }}
+                        </Button>
 
-                <Button
-                    v-if="newVersionUrl"
-                    type="button"
-                    variant="secondary"
-                    class="cursor-pointer"
-                    :disabled="form.processing"
-                    @click="saveAsNewVersion"
-                >
-                    Save as new version
-                </Button>
+                        <Button
+                            v-if="newVersionUrl"
+                            type="button"
+                            variant="secondary"
+                            class="cursor-pointer"
+                            :disabled="form.processing"
+                            @click="saveAsNewVersion"
+                        >
+                            Save as new version
+                        </Button>
+                    </template>
 
-                <Button variant="ghost" as-child class="cursor-pointer">
-                    <Link :href="index()">Cancel</Link>
-                </Button>
-            </div>
+                    <Button variant="ghost" as-child class="cursor-pointer">
+                        <Link :href="index()">{{
+                            readOnly ? 'Back' : 'Cancel'
+                        }}</Link>
+                    </Button>
+                </div>
+            </fieldset>
         </form>
 
         <QuoteTotals

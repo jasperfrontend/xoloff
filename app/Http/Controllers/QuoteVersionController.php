@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Quotes\SaveQuoteVersion;
+use App\Concerns\RefusesDecidedQuotes;
 use App\Enums\AuditAction;
 use App\Http\Requests\QuoteRequest;
 use App\Models\Quote;
@@ -16,6 +17,8 @@ use Inertia\Response;
 
 class QuoteVersionController extends Controller
 {
+    use RefusesDecidedQuotes;
+
     public function __construct(
         private readonly SaveQuoteVersion $saveQuoteVersion,
         private readonly QuoteCalculator $calculator,
@@ -99,6 +102,10 @@ class QuoteVersionController extends Controller
     {
         abort_unless($version->quote_id === $quote->id, 404);
 
+        if ($refusal = $this->refuseIfDecided($quote)) {
+            return $refusal;
+        }
+
         if ($version->version_number === (int) $quote->versions()->max('version_number')) {
             return back()->withErrors([
                 'version' => __('This is the current version of the quote, so it cannot be removed. Delete the whole quote instead.'),
@@ -126,6 +133,10 @@ class QuoteVersionController extends Controller
      */
     public function store(QuoteRequest $request, Quote $quote): RedirectResponse
     {
+        if ($refusal = $this->refuseIfDecided($quote)) {
+            return $refusal;
+        }
+
         $data = $request->validated();
 
         DB::transaction(function () use ($data, $quote): void {

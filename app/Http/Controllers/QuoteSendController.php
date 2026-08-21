@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Quotes\SendQuote;
+use App\Concerns\RefusesDecidedQuotes;
 use App\Http\Requests\SendQuoteRequest;
 use App\Models\Quote;
 use Illuminate\Http\RedirectResponse;
@@ -14,10 +15,16 @@ use Inertia\Inertia;
  */
 class QuoteSendController extends Controller
 {
+    use RefusesDecidedQuotes;
+
     public function __construct(private readonly SendQuote $sendQuote) {}
 
     public function __invoke(SendQuoteRequest $request, Quote $quote): RedirectResponse
     {
+        if ($refusal = $this->refuseIfDecided($quote)) {
+            return $refusal;
+        }
+
         // A quote with nothing saved on it has no content to offer, and a
         // magic link leading to an empty page is worse than a button that
         // declines. Same guard as the PDF, for the same reason.

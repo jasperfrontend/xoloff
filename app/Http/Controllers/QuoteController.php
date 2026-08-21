@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Quotes\SaveQuoteVersion;
+use App\Concerns\RefusesDecidedQuotes;
 use App\Http\Requests\QuoteRequest;
 use App\Models\AppSettings;
 use App\Models\Customer;
@@ -18,6 +19,8 @@ use Inertia\Response;
 
 class QuoteController extends Controller
 {
+    use RefusesDecidedQuotes;
+
     public function __construct(
         private readonly SaveQuoteVersion $saveQuoteVersion,
         private readonly QuoteCalculator $calculator,
@@ -89,6 +92,10 @@ class QuoteController extends Controller
                 'customer_email' => $quote->customer->email,
                 'status' => $quote->status->value,
                 'status_label' => $quote->status->label(),
+                // What the screen stops offering once the customer has
+                // answered. The guards on the server are the protection; this
+                // is only so nobody is invited to try.
+                'is_editable' => ! $quote->hasBeenDecided(),
                 // Why they said no, in their own words (SPEC §3). Null when
                 // they declined without explaining, which they are entitled
                 // to do.
@@ -135,6 +142,10 @@ class QuoteController extends Controller
      */
     public function update(QuoteRequest $request, Quote $quote): RedirectResponse
     {
+        if ($refusal = $this->refuseIfDecided($quote)) {
+            return $refusal;
+        }
+
         $data = $request->validated();
 
         DB::transaction(function () use ($data, $quote): void {
@@ -153,6 +164,10 @@ class QuoteController extends Controller
 
     public function destroy(Quote $quote): RedirectResponse
     {
+        if ($refusal = $this->refuseIfDecided($quote)) {
+            return $refusal;
+        }
+
         $quote->delete();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Quote deleted.')]);

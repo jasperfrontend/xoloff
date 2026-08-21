@@ -26,6 +26,7 @@ interface Quote extends QuoteContent {
     customer_email: string;
     status: QuoteStatus;
     status_label: string;
+    is_editable: boolean;
     deny_reason: string | null;
     sent_at: string | null;
     valid_until: string | null;
@@ -55,6 +56,7 @@ defineOptions({
 const page = usePage();
 const pdfError = computed(() => page.props.errors?.pdf);
 const sendError = computed(() => page.props.errors?.send);
+const quoteError = computed(() => page.props.errors?.quote);
 </script>
 
 <template>
@@ -81,6 +83,7 @@ const sendError = computed(() => page.props.errors?.send);
 
             <div class="flex items-center gap-2">
                 <SendQuoteDialog
+                    v-if="quote.is_editable"
                     :quote-id="quote.id"
                     :customer-email="quote.customer_email"
                     :validity-days="quote.validity_days"
@@ -111,11 +114,27 @@ const sendError = computed(() => page.props.errors?.send);
         </div>
 
         <div
-            v-if="pdfError || sendError"
+            v-if="pdfError || sendError || quoteError"
             class="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-            {{ pdfError ?? sendError }}
+            {{ pdfError ?? sendError ?? quoteError }}
         </div>
+
+        <!--
+            Said plainly rather than left to be inferred from missing buttons.
+            M6 hashes the document at signing as evidence of what the signer
+            saw, and an edit afterwards would leave that hash describing
+            something that no longer exists.
+        -->
+        <p
+            v-if="!quote.is_editable"
+            class="max-w-prose rounded-lg border bg-muted/30 px-4 py-3 text-sm text-foreground"
+        >
+            The customer has
+            {{ quote.status === 'approved' ? 'approved' : 'declined' }} this
+            quote, so it is kept exactly as they answered it and can no longer
+            be changed or deleted. Raise a new quote to offer different terms.
+        </p>
 
         <!--
             A refusal is the one status that comes with something to read, so
@@ -176,7 +195,10 @@ const sendError = computed(() => page.props.errors?.send);
             :submit-url="update(quote.id).url"
             submit-method="put"
             submit-label="Save changes"
-            :new-version-url="storeVersion(quote.id).url"
+            :new-version-url="
+                quote.is_editable ? storeVersion(quote.id).url : undefined
+            "
+            :read-only="!quote.is_editable"
         />
     </div>
 </template>
