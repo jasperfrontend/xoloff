@@ -48,7 +48,7 @@ class QuotePortalController extends Controller
 
         $this->recordTheVisit($quote);
 
-        $quote->load('customer:id,company_name,contact_person');
+        $quote->load('customer:id,company_name,first_name,last_name');
         $version = $quote->currentVersion()->with('lineItems.taxClass')->first();
 
         return Inertia::render('portal/Quote', [

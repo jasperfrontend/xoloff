@@ -36,7 +36,9 @@ class ValidationMessagesTest extends TestCase
         return [
             'customers' => ['post', 'customers.store', [
                 'company_name' => '',
-                'contact_person' => '',
+                'first_name' => '',
+                'last_name' => '',
+                'salutation' => 'kapitein',
                 'email' => 'not an email',
                 'billing_address' => '',
                 'country' => 'XX',

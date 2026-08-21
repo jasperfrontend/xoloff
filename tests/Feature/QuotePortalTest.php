@@ -28,14 +28,14 @@ class QuotePortalTest extends TestCase
 
     public function test_a_customer_can_open_their_link_without_signing_in()
     {
-        $quote = $this->sentQuote(['company_name' => 'Acme BV', 'contact_person' => 'Anna']);
+        $quote = $this->sentQuote(['company_name' => 'Acme BV', 'first_name' => 'Anna', 'last_name' => 'Bakker']);
 
         $this->get($this->link($quote))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('portal/Quote')
                 ->where('quote.company_name', 'Acme BV')
-                ->where('quote.contact_person', 'Anna'),
+                ->where('quote.contact_person', 'Anna Bakker'),
             );
     }
 

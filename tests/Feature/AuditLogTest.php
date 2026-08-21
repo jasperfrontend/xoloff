@@ -31,7 +31,8 @@ class AuditLogTest extends TestCase
         $this->actingAs($user = User::factory()->create())
             ->post(route('customers.store'), [
                 'company_name' => 'Acme BV',
-                'contact_person' => 'Sam Jansen',
+                'first_name' => 'Sam',
+                'last_name' => 'Jansen',
                 'email' => 'sam@acme.nl',
                 'billing_address' => 'Dorpsstraat 1',
                 'country' => 'NL',

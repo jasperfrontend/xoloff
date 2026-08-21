@@ -16,7 +16,9 @@ import { index } from '@/routes/customers';
 
 interface Customer {
     company_name: string;
-    contact_person: string;
+    salutation: string | null;
+    first_name: string;
+    last_name: string;
     email: string;
     billing_address: string;
     country: string;
@@ -25,9 +27,17 @@ interface Customer {
 const props = defineProps<{
     action: Record<string, unknown>;
     countries: Record<string, string>;
+    salutations: Record<string, string>;
     customer?: Customer;
     submitLabel: string;
 }>();
+
+/**
+ * The select needs a value for "no salutation", because an empty string is not
+ * something it can hold. It is translated back to nothing on submit, which is
+ * what the nullable column and the nullable rule expect.
+ */
+const NO_SALUTATION = 'none';
 
 const country = props.customer?.country ?? 'NL';
 const billingAddress = ref(props.customer?.billing_address ?? '');
@@ -37,6 +47,13 @@ const billingAddress = ref(props.customer?.billing_address ?? '');
     <Form
         v-bind="action"
         class="max-w-2xl space-y-6"
+        :transform="
+            (data) => ({
+                ...data,
+                salutation:
+                    data.salutation === NO_SALUTATION ? null : data.salutation,
+            })
+        "
         v-slot="{ errors, processing }"
     >
         <div class="grid gap-2">
@@ -51,15 +68,62 @@ const billingAddress = ref(props.customer?.billing_address ?? '');
             <InputError :message="errors.company_name" />
         </div>
 
-        <div class="grid gap-2">
-            <Label for="contact_person">Contact person</Label>
-            <Input
-                id="contact_person"
-                name="contact_person"
-                :default-value="customer?.contact_person"
-                required
-            />
-            <InputError :message="errors.contact_person" />
+        <!--
+            Three fields rather than one, because a quote text greets a person
+            by name and "Beste Daan Daansen" is not how anyone writes. The
+            salutation sits first, in the order the words appear in a sentence.
+        -->
+        <div class="grid gap-4 sm:grid-cols-[10rem_1fr_1fr]">
+            <div class="grid gap-2">
+                <Label for="salutation">Salutation</Label>
+                <Select
+                    name="salutation"
+                    :default-value="customer?.salutation ?? NO_SALUTATION"
+                >
+                    <SelectTrigger id="salutation" class="cursor-pointer">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            :value="NO_SALUTATION"
+                            class="cursor-pointer"
+                        >
+                            None
+                        </SelectItem>
+                        <SelectItem
+                            v-for="(label, value) in salutations"
+                            :key="value"
+                            :value="value"
+                            class="cursor-pointer"
+                        >
+                            {{ label }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+                <InputError :message="errors.salutation" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="first_name">First name</Label>
+                <Input
+                    id="first_name"
+                    name="first_name"
+                    :default-value="customer?.first_name"
+                    required
+                />
+                <InputError :message="errors.first_name" />
+            </div>
+
+            <div class="grid gap-2">
+                <Label for="last_name">Last name</Label>
+                <Input
+                    id="last_name"
+                    name="last_name"
+                    :default-value="customer?.last_name"
+                    required
+                />
+                <InputError :message="errors.last_name" />
+            </div>
         </div>
 
         <div class="grid gap-2">

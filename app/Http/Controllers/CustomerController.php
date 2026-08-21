@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Salutation;
 use App\Http\Requests\CustomerRequest;
 use App\Models\Customer;
 use Illuminate\Http\RedirectResponse;
@@ -16,14 +17,23 @@ class CustomerController extends Controller
         return Inertia::render('customers/Index', [
             'customers' => Customer::query()
                 ->orderBy('company_name')
-                ->get(['id', 'company_name', 'contact_person', 'email', 'country']),
+                ->get(['id', 'company_name', 'first_name', 'last_name', 'email', 'country'])
+                ->map(fn (Customer $customer): array => [
+                    'id' => $customer->id,
+                    'company_name' => $customer->company_name,
+                    // Derived from the parts rather than stored, so a list and
+                    // a form can never disagree about someone's name.
+                    'contact_person' => $customer->contact_person,
+                    'email' => $customer->email,
+                    'country' => $customer->country,
+                ]),
         ]);
     }
 
     public function create(): Response
     {
         return Inertia::render('customers/Create', [
-            'countries' => Config::array('xoloff.countries'),
+            ...$this->formOptions(),
         ]);
     }
 
@@ -40,7 +50,7 @@ class CustomerController extends Controller
     {
         return Inertia::render('customers/Edit', [
             'customer' => $customer,
-            'countries' => Config::array('xoloff.countries'),
+            ...$this->formOptions(),
         ]);
     }
 
@@ -51,6 +61,24 @@ class CustomerController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Customer updated.')]);
 
         return to_route('customers.index');
+    }
+
+    /**
+     * The choices the form offers. Labelled by the server, so the wording
+     * cannot drift between here and anywhere else these appear.
+     *
+     * @return array<string, mixed>
+     */
+    private function formOptions(): array
+    {
+        return [
+            'countries' => Config::array('xoloff.countries'),
+            'salutations' => collect(Salutation::cases())
+                ->mapWithKeys(fn (Salutation $salutation): array => [
+                    $salutation->value => $salutation->label(),
+                ])
+                ->all(),
+        ];
     }
 
     public function destroy(Customer $customer): RedirectResponse

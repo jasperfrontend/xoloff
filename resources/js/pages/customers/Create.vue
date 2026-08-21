@@ -5,7 +5,10 @@ import Heading from '@/components/Heading.vue';
 import CustomerForm from '@/pages/customers/Form.vue';
 import { create, index } from '@/routes/customers';
 
-defineProps<{ countries: Record<string, string> }>();
+defineProps<{
+    countries: Record<string, string>;
+    salutations: Record<string, string>;
+}>();
 
 defineOptions({
     layout: {
@@ -30,6 +33,7 @@ defineOptions({
         <CustomerForm
             :action="CustomerController.store.form()"
             :countries="countries"
+            :salutations="salutations"
             submit-label="Create customer"
         />
     </div>

@@ -8,7 +8,9 @@ import { index } from '@/routes/customers';
 interface Customer {
     id: number;
     company_name: string;
-    contact_person: string;
+    salutation: string | null;
+    first_name: string;
+    last_name: string;
     email: string;
     billing_address: string;
     country: string;
@@ -17,6 +19,7 @@ interface Customer {
 defineProps<{
     customer: Customer;
     countries: Record<string, string>;
+    salutations: Record<string, string>;
 }>();
 
 defineOptions({
@@ -39,6 +42,7 @@ defineOptions({
         <CustomerForm
             :action="CustomerController.update.form(customer.id)"
             :countries="countries"
+            :salutations="salutations"
             :customer="customer"
             submit-label="Save changes"
         />
