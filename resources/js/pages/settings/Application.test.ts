@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AppSettingsEdit from '@/pages/app-settings/Edit.vue';
+import AppSettingsEdit from '@/pages/settings/Application.vue';
 import { resetInertiaStub, submissions } from '@/test-support/inertia';
 
 vi.mock('@inertiajs/vue3', async () =>
@@ -41,7 +41,7 @@ const details = {
     company_vat_number: 'NL001234567B01',
 };
 
-describe('app-settings/Edit', () => {
+describe('settings/Application', () => {
     beforeEach(() => {
         resetInertiaStub();
     });

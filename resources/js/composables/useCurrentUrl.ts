@@ -42,8 +42,20 @@ export function useCurrentUrl(): UseCurrentUrlReturn {
         const urlToCompare = currentUrl ?? currentUrlReactive.value;
         const urlString = toUrl(urlToCheck);
 
-        const comparePath = (path: string): boolean =>
-            startsWith ? urlToCompare.startsWith(path) : path === urlToCompare;
+        // A parent match is by path segment, not by characters. Plain
+        // startsWith makes /settings/app a parent of /settings/appearance,
+        // which lit up two navigation items at once.
+        const comparePath = (path: string): boolean => {
+            if (!startsWith) {
+                return path === urlToCompare;
+            }
+
+            const parent = path.endsWith('/') ? path.slice(0, -1) : path;
+
+            return (
+                urlToCompare === parent || urlToCompare.startsWith(`${parent}/`)
+            );
+        };
 
         if (!urlString.startsWith('http')) {
             return comparePath(urlString);

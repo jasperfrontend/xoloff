@@ -12,10 +12,10 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Application-wide configuration, as opposed to the per-user screens under
- * /settings. The logo the quote template prints (SPEC §6) and Xolution's own
- * details printed alongside it (SPEC §7); the notification toggles arrive
- * in M7.
+ * Configuration shared by everyone, as opposed to the per-user screens beside
+ * it under /settings. The logo the quote template prints (SPEC §6) and
+ * Xolution's own details printed alongside it (SPEC §7); the notification
+ * toggles arrive in M7.
  *
  * The logo saves through its own route rather than with the rest, because
  * fetching it can fail for reasons that have nothing to do with the other
@@ -46,7 +46,7 @@ class AppSettingsController extends Controller
     {
         $settings = AppSettings::current();
 
-        return Inertia::render('app-settings/Edit', [
+        return Inertia::render('settings/Application', [
             'settings' => [
                 'logo_vector_url' => $settings->logo_vector_url,
                 'logo_raster_url' => $settings->logo_raster_url,

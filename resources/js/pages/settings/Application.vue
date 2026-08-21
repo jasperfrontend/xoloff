@@ -26,7 +26,7 @@ const props = defineProps<{
 
 defineOptions({
     layout: {
-        breadcrumbs: [{ title: 'Settings', href: edit() }],
+        breadcrumbs: [{ title: 'Application settings', href: edit() }],
     },
 });
 
@@ -45,12 +45,14 @@ const previews = computed(() => [
 </script>
 
 <template>
-    <Head title="Settings" />
+    <Head title="Application settings" />
 
-    <div class="flex flex-col space-y-6 p-4">
+    <h1 class="sr-only">Application settings</h1>
+
+    <div class="flex flex-col space-y-6">
         <Heading
             variant="small"
-            title="Settings"
+            title="Application"
             description="Configuration shared by everyone, not your own account"
         />
 

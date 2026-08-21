@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AppSettingsController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LogoController;
@@ -108,17 +107,6 @@ Route::middleware(['auth'])->group(function () {
     // only kind worth keeping.
     Route::get('audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
 
-    // Application-wide configuration, as opposed to the per-user screens under
-    // /settings. One row, so this edits rather than creating (SPEC §3).
-    // The logo saves separately from the typed settings: a file input cannot
-    // be redisplayed with what was submitted, so one shared form would drop
-    // the chosen file whenever anything else on the screen failed validation.
-    Route::get('app-settings', [AppSettingsController::class, 'edit'])->name('app-settings.edit');
-    Route::put('app-settings', [AppSettingsController::class, 'update'])->name('app-settings.update');
-    // Both addresses save together. Clearing one removes that logo, so there
-    // is no separate delete to keep in step with this.
-    Route::put('app-settings/logo', [AppSettingsController::class, 'storeLogo'])
-        ->name('app-settings.logo.store');
 });
 
 require __DIR__.'/settings.php';

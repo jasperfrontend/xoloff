@@ -199,10 +199,24 @@ function useForm<T extends Record<string, unknown>>(initial: T | (() => T)) {
 }
 
 /**
+ * The address the test is pretending to be at. Anything reading it does so
+ * through a getter, so a test can move the page and have what it mounted
+ * follow along.
+ */
+export const pageState = reactive({ url: '/' });
+
+/**
  * Returns whatever the current test put in pageProps.
  */
 function usePage() {
-    return { props: pageProps, url: '/', component: 'Test', version: null };
+    return {
+        props: pageProps,
+        get url() {
+            return pageState.url;
+        },
+        component: 'Test',
+        version: null,
+    };
 }
 
 const router = {
@@ -269,6 +283,7 @@ export function resetInertiaStub() {
     visits.length = 0;
     httpResponse.value = undefined;
     pageProps.errors = {};
+    pageState.url = '/';
     router.visit.mockClear();
     router.get.mockClear();
     router.post.mockClear();

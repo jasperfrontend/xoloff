@@ -10,7 +10,6 @@ import {
     LayoutGrid,
     Package,
     Percent,
-    Settings,
     Tags,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -27,7 +26,6 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { edit as appSettingsEdit } from '@/routes/app-settings';
 import { index as auditLogIndex } from '@/routes/audit-log';
 import { index as customersIndex } from '@/routes/customers';
 import { edit as premadeTextsEdit } from '@/routes/premade-texts';
@@ -77,11 +75,6 @@ const mainNavItems: NavItem[] = [
         title: 'Audit log',
         href: auditLogIndex(),
         icon: ScrollText,
-    },
-    {
-        title: 'Settings',
-        href: appSettingsEdit(),
-        icon: Settings,
     },
 ];
 

@@ -22,13 +22,24 @@ class AppSettingsTest extends TestCase
         $this->assertNull(AppSettings::current()->logo_vector_url);
     }
 
+    /**
+     * Under /settings rather than beside it. It is settings, and a screen of
+     * settings without the settings navigation on it reads as a different
+     * application, which is what it looked like at /app-settings.
+     */
+    public function test_it_lives_among_the_other_settings()
+    {
+        $this->assertSame('/settings/app', route('app-settings.edit', absolute: false));
+        $this->assertSame('/settings/app/logo', route('app-settings.logo.store', absolute: false));
+    }
+
     public function test_the_screen_opens_before_anything_has_been_filled_in()
     {
         $this->actingAs(User::factory()->create())
             ->get(route('app-settings.edit'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('app-settings/Edit')
+                ->component('settings/Application')
                 ->where('settings.logo_vector_url', null)
                 ->where('settings.logo_raster_url', null)
                 ->where('settings.logo_vector_preview_url', null)
