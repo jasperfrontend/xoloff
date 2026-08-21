@@ -43,7 +43,15 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
         />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
-            <aside class="w-full max-w-xl lg:w-48">
+            <!--
+                Follows you down a long settings page once there is room
+                beside it. self-start is what makes it work: a flex item
+                stretches to the row's height by default, leaving nothing for
+                it to slide within.
+            -->
+            <aside
+                class="w-full max-w-xl lg:sticky lg:top-6 lg:w-48 lg:self-start"
+            >
                 <nav
                     class="flex flex-col space-y-1 space-x-0"
                     aria-label="Settings"

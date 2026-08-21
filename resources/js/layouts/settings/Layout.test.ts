@@ -51,4 +51,22 @@ describe('settings/Layout', () => {
 
         expect(highlighted()).toEqual(['Application']);
     });
+
+    /**
+     * A settings page is long and its navigation is short, so the navigation
+     * follows you down rather than scrolling away. Only where there is room
+     * beside the content: stacked on a narrow screen it would pin itself over
+     * what you came to read.
+     *
+     * self-start is load-bearing. A flex item stretches to the height of the
+     * row by default, which leaves a sticky one nothing to slide within.
+     */
+    it('keeps the navigation in view on a wide screen', () => {
+        const aside = mount(SettingsLayout).find('aside');
+
+        expect(aside.classes()).toEqual(
+            expect.arrayContaining(['lg:sticky', 'lg:top-6', 'lg:self-start']),
+        );
+        expect(aside.classes()).not.toContain('sticky');
+    });
 });

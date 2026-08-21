@@ -18,7 +18,13 @@ withDefaults(defineProps<Props>(), {
 <template>
     <AppShell variant="sidebar">
         <AppSidebar />
-        <AppContent variant="sidebar" class="overflow-x-hidden">
+        <!--
+            Clip rather than hidden. Both keep a wide table from
+            scrolling the page sideways, but hidden makes this element a
+            scroll container, and position: sticky inside a scroll container
+            that never scrolls simply does not stick.
+        -->
+        <AppContent variant="sidebar" class="overflow-x-clip">
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <slot />
         </AppContent>
